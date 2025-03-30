@@ -34,28 +34,34 @@ public abstract class ScoreSyntaxName(SourceRange range)
 {
 }
 
-public sealed class ScoreSyntaxNameIdentifier(ScoreToken identifierToken)
+public sealed class ScoreSyntaxNameIdentifier(ScoreSyntaxToken identifierToken)
     : ScoreSyntaxName(identifierToken.Range)
 {
-    public ScoreToken IdentifierToken { get; } = identifierToken;
+    public override string DebugNodeName { get; } = nameof(ScoreSyntaxNameIdentifier);
+
+    public ScoreSyntaxToken IdentifierToken { get; } = identifierToken;
     public ReadOnlyMemory<char> Spelling => IdentifierToken.StringValue;
     public override IEnumerable<ScoreSyntaxNode> Children { get; } = [identifierToken];
 }
 
-public sealed class ScoreSyntaxNameOperator(OverloadableOperator @operator, IReadOnlyList<ScoreToken> operatorTokens)
+public sealed class ScoreSyntaxNameOperator(OverloadableOperator @operator, IReadOnlyList<ScoreSyntaxToken> operatorTokens)
     : ScoreSyntaxName(new(operatorTokens[0].Range.Begin, operatorTokens[^1].Range.End))
 {
+    public override string DebugNodeName { get; } = nameof(ScoreSyntaxNameOperator);
+
     public OverloadableOperator Operator { get; } = @operator;
-    public IReadOnlyList<ScoreToken> OperatorTokens { get; } = operatorTokens;
+    public IReadOnlyList<ScoreSyntaxToken> OperatorTokens { get; } = operatorTokens;
     public override IEnumerable<ScoreSyntaxNode> Children { get; } = operatorTokens;
 }
 
-public sealed class ScoreSyntaxNameOperatorCast(ScoreToken castKeywordToken, ScoreToken openParenToken, ScoreSyntaxTypeQual castType, ScoreToken closeParenToken)
+public sealed class ScoreSyntaxNameOperatorCast(ScoreSyntaxToken castKeywordToken, ScoreSyntaxToken openParenToken, ScoreSyntaxTypeQual castType, ScoreSyntaxToken closeParenToken)
     : ScoreSyntaxName(new(castKeywordToken.Range.Begin, closeParenToken.Range.End))
 {
-    public ScoreToken CastKeywordToken { get; } = castKeywordToken;
-    public ScoreToken OpenParenToken { get; } = openParenToken;
+    public override string DebugNodeName { get; } = nameof(ScoreSyntaxNameOperatorCast);
+
+    public ScoreSyntaxToken CastKeywordToken { get; } = castKeywordToken;
+    public ScoreSyntaxToken OpenParenToken { get; } = openParenToken;
     public ScoreSyntaxTypeQual CastType { get; } = castType;
-    public ScoreToken CloseParenToken { get; } = closeParenToken;
+    public ScoreSyntaxToken CloseParenToken { get; } = closeParenToken;
     public override IEnumerable<ScoreSyntaxNode> Children { get; } = [castKeywordToken, openParenToken, castType, closeParenToken];
 }

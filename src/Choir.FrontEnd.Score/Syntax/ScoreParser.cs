@@ -36,23 +36,23 @@ public sealed class ScoreParser
         return new ScoreSyntaxUnit(source, tokens, topLevelNodes);
     }
 
-    private static ScoreToken CreateMissingToken(SourceLocation location)
+    private static ScoreSyntaxToken CreateMissingToken(SourceLocation location)
     {
-        return new ScoreToken(ScoreTokenKind.Missing, new(location, location), new([], true), new([], false));
+        return new ScoreSyntaxToken(ScoreTokenKind.Missing, new(location, location), new([], true), new([], false));
     }
 
     private readonly ScoreContext _context;
     private readonly SourceText _source;
-    private readonly List<ScoreToken> _tokens;
+    private readonly List<ScoreSyntaxToken> _tokens;
 
     private int _readPosition;
 
     private bool IsAtEnd => _readPosition >= _tokens.Count - 1;
-    private ScoreToken CurrentToken => PeekToken();
+    private ScoreSyntaxToken CurrentToken => PeekToken();
     private SourceRange CurrentRange => CurrentToken.Range;
     private SourceLocation CurrentLocation => CurrentRange.Begin;
 
-    private ScoreParser(ScoreContext context, SourceText source, List<ScoreToken> tokens)
+    private ScoreParser(ScoreContext context, SourceText source, List<ScoreSyntaxToken> tokens)
     {
         _context = context;
         _source = source;
@@ -71,7 +71,7 @@ public sealed class ScoreParser
         return PeekToken(ahead).Kind == kind;
     }
 
-    private ScoreToken Consume()
+    private ScoreSyntaxToken Consume()
     {
         if (IsAtEnd) return _tokens[^1];
         var result = _tokens[_readPosition];
@@ -79,7 +79,7 @@ public sealed class ScoreParser
         return result;
     }
 
-    private bool TryConsume(ScoreTokenKind kind, [NotNullWhen(true)] out ScoreToken? token)
+    private bool TryConsume(ScoreTokenKind kind, [NotNullWhen(true)] out ScoreSyntaxToken? token)
     {
         token = null;
         if (CurrentToken.Kind != kind)
@@ -89,9 +89,9 @@ public sealed class ScoreParser
         return true;
     }
 
-    private ScoreToken PeekToken(int ahead = 0)
+    private ScoreSyntaxToken PeekToken(int ahead = 0)
     {
-        _context.Assert(ahead >= 0, $"Parameter {nameof(ahead)} to function {nameof(ScoreToken)}::{nameof(PeekToken)} must be non-negative; the parser should never rely on token look-back.");
+        _context.Assert(ahead >= 0, $"Parameter {nameof(ahead)} to function {nameof(ScoreSyntaxToken)}::{nameof(PeekToken)} must be non-negative; the parser should never rely on token look-back.");
 
         int peekIndex = _readPosition + ahead;
         if (peekIndex >= _tokens.Count)
@@ -104,7 +104,7 @@ public sealed class ScoreParser
         return _tokens[peekIndex];
     }
 
-    private ScoreToken ExpectToken(ScoreTokenKind kind, string tokenSpelling)
+    private ScoreSyntaxToken ExpectToken(ScoreTokenKind kind, string tokenSpelling)
     {
         if (TryConsume(kind, out var expectedToken))
             return expectedToken;
@@ -113,25 +113,25 @@ public sealed class ScoreParser
         return CreateMissingToken(CurrentLocation);
     }
 
-    private ScoreToken ExpectIdentifier()
+    private ScoreSyntaxToken ExpectIdentifier()
     {
         if (TryConsume(ScoreTokenKind.Identifier, out var expectedToken))
             return expectedToken;
 
         _context.ErrorIdentifierExpected(_source, CurrentLocation);
 
-        var missingToken = new ScoreToken(ScoreTokenKind.Missing, new(CurrentLocation, CurrentLocation), new([], true), new([], false));
+        var missingToken = new ScoreSyntaxToken(ScoreTokenKind.Missing, new(CurrentLocation, CurrentLocation), new([], true), new([], false));
         return missingToken;
     }
 
-    private ScoreToken ExpectSemiColon()
+    private ScoreSyntaxToken ExpectSemiColon()
     {
         if (TryConsume(ScoreTokenKind.SemiColon, out var expectedToken))
             return expectedToken;
 
         _context.ErrorSemiColonExpected(_source, CurrentLocation);
 
-        var missingToken = new ScoreToken(ScoreTokenKind.Missing, new(CurrentLocation, CurrentLocation), new([], true), new([], false));
+        var missingToken = new ScoreSyntaxToken(ScoreTokenKind.Missing, new(CurrentLocation, CurrentLocation), new([], true), new([], false));
         return missingToken;
     }
 
@@ -157,12 +157,12 @@ public sealed class ScoreParser
         }
     }
 
-    private (List<TSyntaxNode> Nodes, List<ScoreToken> Delimiters) ParseDelimited<TSyntaxNode>(ScoreTokenKind delimiterKind, Func<TSyntaxNode> parserCallback,
+    private (List<TSyntaxNode> Nodes, List<ScoreSyntaxToken> Delimiters) ParseDelimited<TSyntaxNode>(ScoreTokenKind delimiterKind, Func<TSyntaxNode> parserCallback,
         bool allowTrailingDelimiter = false, ScoreTokenKind closingTokenKind = ScoreTokenKind.Invalid)
         where TSyntaxNode : ScoreSyntaxNode
     {
         List<TSyntaxNode> nodes = [];
-        List<ScoreToken> delimiterTokens = [];
+        List<ScoreSyntaxToken> delimiterTokens = [];
 
         if (IsAtEnd || At(closingTokenKind))
             return (nodes, delimiterTokens);
@@ -184,7 +184,7 @@ public sealed class ScoreParser
 
     private ScoreSyntaxTypeQual ParseType()
     {
-        ScoreToken? readAccessKeywordToken = null;
+        ScoreSyntaxToken? readAccessKeywordToken = null;
 
         switch (CurrentToken.Kind)
         {

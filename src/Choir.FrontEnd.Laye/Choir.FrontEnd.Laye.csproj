@@ -27,4 +27,10 @@
 		<ProjectReference Include="..\Choir\Choir.csproj" />
 	</ItemGroup>
 
+	<ItemGroup>
+	  <Folder Include="LanguageServer\" />
+	  <Folder Include="Types\" />
+	  <Folder Include="Semantics\" />
+	</ItemGroup>
+
 </Project>

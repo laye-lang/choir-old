@@ -10,22 +10,26 @@ public abstract class ScoreSyntaxExpr(SourceRange range)
 /// <summary>
 /// For expressions which don't come with a semicolon in a statement context require one.
 /// </summary>
-public sealed class ScoreSyntaxExprStmt(ScoreSyntaxExpr expr, ScoreToken semiColonToken)
+public sealed class ScoreSyntaxExprStmt(ScoreSyntaxExpr expr, ScoreSyntaxToken semiColonToken)
     : ScoreSyntaxExpr(expr.Range)
 {
+    public override string DebugNodeName { get; } = nameof(ScoreSyntaxExprStmt);
+
     public ScoreSyntaxExpr Expr { get; } = expr;
-    public ScoreToken SemiColonToken { get; } = semiColonToken;
+    public ScoreSyntaxToken SemiColonToken { get; } = semiColonToken;
     public override IEnumerable<ScoreSyntaxNode> Children { get; } = [expr, semiColonToken];
 }
 
 #region Statements
 
-public sealed class ScoreSyntaxExprReturn(ScoreToken returnKeywordToken, ScoreSyntaxExpr? returnValue, ScoreToken semiColonToken)
+public sealed class ScoreSyntaxExprReturn(ScoreSyntaxToken returnKeywordToken, ScoreSyntaxExpr? returnValue, ScoreSyntaxToken semiColonToken)
     : ScoreSyntaxExpr(returnKeywordToken.Range)
 {
-    public ScoreToken ReturnKeywordToken { get; } = returnKeywordToken;
+    public override string DebugNodeName { get; } = nameof(ScoreSyntaxExprReturn);
+
+    public ScoreSyntaxToken ReturnKeywordToken { get; } = returnKeywordToken;
     public ScoreSyntaxExpr? ReturnValue { get; } = returnValue;
-    public ScoreToken SemiColonToken { get; } = semiColonToken;
+    public ScoreSyntaxToken SemiColonToken { get; } = semiColonToken;
     public override IEnumerable<ScoreSyntaxNode> Children { get; } = returnValue is null ? [returnKeywordToken, semiColonToken] : [returnKeywordToken, returnValue, semiColonToken];
 }
 
@@ -33,19 +37,23 @@ public sealed class ScoreSyntaxExprReturn(ScoreToken returnKeywordToken, ScoreSy
 
 #region Expressions
 
-public sealed class ScoreSyntaxExprLiteral(ScoreToken literalToken)
+public sealed class ScoreSyntaxExprLiteral(ScoreSyntaxToken literalToken)
     : ScoreSyntaxExpr(literalToken.Range)
 {
-    public ScoreToken LiteralToken { get; } = literalToken;
+    public override string DebugNodeName { get; } = nameof(ScoreSyntaxExprLiteral);
+
+    public ScoreSyntaxToken LiteralToken { get; } = literalToken;
     public override IEnumerable<ScoreSyntaxNode> Children { get; } = [literalToken];
 }
 
-public sealed class ScoreSyntaxExprCompound(ScoreToken openCurlyToken, IReadOnlyList<ScoreSyntaxNode> childNodes, ScoreToken closeCurlyToken)
+public sealed class ScoreSyntaxExprCompound(ScoreSyntaxToken openCurlyToken, IReadOnlyList<ScoreSyntaxNode> childNodes, ScoreSyntaxToken closeCurlyToken)
     : ScoreSyntaxExpr(openCurlyToken.Range)
 {
-    public ScoreToken OpenCurlyToken { get; } = openCurlyToken;
+    public override string DebugNodeName { get; } = nameof(ScoreSyntaxExprCompound);
+
+    public ScoreSyntaxToken OpenCurlyToken { get; } = openCurlyToken;
     public IReadOnlyList<ScoreSyntaxNode> ChildNodes { get; } = childNodes;
-    public ScoreToken CloseCurlyToken { get; } = closeCurlyToken;
+    public ScoreSyntaxToken CloseCurlyToken { get; } = closeCurlyToken;
     public override IEnumerable<ScoreSyntaxNode> Children { get; } = [openCurlyToken, .. childNodes, closeCurlyToken];
 }
 

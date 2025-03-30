@@ -1,0 +1,9 @@
+
+struct(T) Maybe {
+    variant Some { value: T; }
+    variant None;
+}
+
+implicit operator(T) Maybe(T)(value: T) {
+    return Maybe::Some { value };
+}

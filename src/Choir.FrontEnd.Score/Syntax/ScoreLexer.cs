@@ -7,10 +7,10 @@ namespace Choir.FrontEnd.Score.Syntax;
 
 public sealed class ScoreLexer
 {
-    public static List<ScoreToken> ReadTokens(ScoreContext context, SourceText source)
+    public static List<ScoreSyntaxToken> ReadTokens(ScoreContext context, SourceText source)
     {
         var lexer = new ScoreLexer(context, source);
-        var tokens = new List<ScoreToken>();
+        var tokens = new List<ScoreSyntaxToken>();
 
         while (true)
         {
@@ -229,7 +229,7 @@ public sealed class ScoreLexer
         return new(trivia, isLeading);
     }
 
-    public ScoreToken ReadToken()
+    public ScoreSyntaxToken ReadToken()
     {
         var leadingTrivia = ReadTrivia(isLeading: true);
         var beginLocation = CurrentLocation;
@@ -311,7 +311,7 @@ public sealed class ScoreLexer
                         tokenKind = ScoreTokenKind.FloatSized;
                     else stringValue = tokenStringValue;
 
-                    bool IsSubstringOnlyDigits(ReadOnlySpan<char> s)
+                    static bool IsSubstringOnlyDigits(ReadOnlySpan<char> s)
                     {
                         foreach (char c in s)
                         {

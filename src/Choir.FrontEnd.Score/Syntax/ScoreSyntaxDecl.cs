@@ -13,21 +13,23 @@ public abstract class ScoreSyntaxDeclNamed(ScoreSyntaxName name)
     public ScoreSyntaxName Name { get; } = name;
 }
 
-public sealed class ScoreSyntaxDeclFunc(ScoreToken funcKeywordToken, ScoreSyntaxName funcName,
-    ScoreToken openParenToken, ScoreSyntaxDeclFuncParams declParams, ScoreToken closeParenToken,
-    ScoreToken? arrowToken, ScoreSyntaxTypeQual? returnType, ScoreSyntaxFuncBody funcBody)
+public sealed class ScoreSyntaxDeclFunc(ScoreSyntaxToken funcKeywordToken, ScoreSyntaxName funcName,
+    ScoreSyntaxToken openParenToken, ScoreSyntaxDeclFuncParams declParams, ScoreSyntaxToken closeParenToken,
+    ScoreSyntaxToken? arrowToken, ScoreSyntaxTypeQual? returnType, ScoreSyntaxFuncBody funcBody)
     : ScoreSyntaxDeclNamed(funcName)
 {
-    public ScoreToken FuncKeywordToken { get; } = funcKeywordToken;
-    public ScoreToken OpenParenToken { get; } = openParenToken;
+    public override string DebugNodeName { get; } = nameof(ScoreSyntaxDeclFunc);
+
+    public ScoreSyntaxToken FuncKeywordToken { get; } = funcKeywordToken;
+    public ScoreSyntaxToken OpenParenToken { get; } = openParenToken;
     public ScoreSyntaxDeclFuncParams DeclParams { get; } = declParams;
-    public ScoreToken CloseParenToken { get; } = closeParenToken;
-    public ScoreToken? ArrowToken { get; } = arrowToken;
+    public ScoreSyntaxToken CloseParenToken { get; } = closeParenToken;
+    public ScoreSyntaxToken? ArrowToken { get; } = arrowToken;
     public ScoreSyntaxTypeQual? ReturnType { get; } = returnType;
     public ScoreSyntaxFuncBody FuncBody { get; } = funcBody;
 
-    public ScoreSyntaxDeclFunc(ScoreToken funcKeywordToken, ScoreSyntaxName funcName, ScoreToken openParenToken,
-        ScoreSyntaxDeclFuncParams declParams, ScoreToken closeParenToken, ScoreSyntaxFuncBody funcBody)
+    public ScoreSyntaxDeclFunc(ScoreSyntaxToken funcKeywordToken, ScoreSyntaxName funcName, ScoreSyntaxToken openParenToken,
+        ScoreSyntaxDeclFuncParams declParams, ScoreSyntaxToken closeParenToken, ScoreSyntaxFuncBody funcBody)
         : this(funcKeywordToken, funcName, openParenToken, declParams, closeParenToken, null, null, funcBody)
     { 
     }
@@ -36,11 +38,13 @@ public sealed class ScoreSyntaxDeclFunc(ScoreToken funcKeywordToken, ScoreSyntax
         .. new ScoreSyntaxNode?[] { arrowToken, returnType }.Where(n => n is not null).Cast<ScoreSyntaxNode>(), funcBody];
 }
 
-public class ScoreSyntaxDeclFuncParams(List<ScoreSyntaxDeclFuncParam> declParams, List<ScoreToken> commaTokens)
+public class ScoreSyntaxDeclFuncParams(List<ScoreSyntaxDeclFuncParam> declParams, List<ScoreSyntaxToken> commaTokens)
     : ScoreSyntaxNode(declParams.Count == 0 ? new() : new(declParams[0].Range.Begin, declParams[^1].Range.End))
 {
+    public override string DebugNodeName { get; } = nameof(ScoreSyntaxDeclFuncParams);
+
     public List<ScoreSyntaxDeclFuncParam> DeclParams { get; } = declParams;
-    public List<ScoreToken> CommaTokens { get; } = commaTokens;
+    public List<ScoreSyntaxToken> CommaTokens { get; } = commaTokens;
 
     public override IEnumerable<ScoreSyntaxNode> Children { get; } = declParams
         .Select(p => (p.Range, Node: (ScoreSyntaxNode)p))
@@ -49,10 +53,12 @@ public class ScoreSyntaxDeclFuncParams(List<ScoreSyntaxDeclFuncParam> declParams
         .Select(pair => pair.Node);
 }
 
-public class ScoreSyntaxDeclFuncParam(ScoreSyntaxName paramName, ScoreToken colonToken, ScoreSyntaxTypeQual paramType)
+public class ScoreSyntaxDeclFuncParam(ScoreSyntaxName paramName, ScoreSyntaxToken colonToken, ScoreSyntaxTypeQual paramType)
     : ScoreSyntaxDeclNamed(paramName)
 {
-    public ScoreToken ColonToken { get; } = colonToken;
+    public override string DebugNodeName { get; } = nameof(ScoreSyntaxDeclFuncParam);
+
+    public ScoreSyntaxToken ColonToken { get; } = colonToken;
     public ScoreSyntaxTypeQual ParamType { get; } = paramType;
     public override IEnumerable<ScoreSyntaxNode> Children { get; } = [paramName, colonToken, paramType];
 }
@@ -62,17 +68,21 @@ public abstract class ScoreSyntaxFuncBody(SourceRange range)
 {
 }
 
-public sealed class ScoreSyntaxFuncBodyEmpty(ScoreToken semiColonToken)
+public sealed class ScoreSyntaxFuncBodyEmpty(ScoreSyntaxToken semiColonToken)
     : ScoreSyntaxFuncBody(semiColonToken.Range)
 {
-    public ScoreToken SemiColonToken { get; } = semiColonToken;
+    public override string DebugNodeName { get; } = nameof(ScoreSyntaxFuncBodyEmpty);
+
+    public ScoreSyntaxToken SemiColonToken { get; } = semiColonToken;
     public override IEnumerable<ScoreSyntaxNode> Children { get; } = [semiColonToken];
 }
 
-public sealed class ScoreSyntaxFuncBodyImplicitReturn(ScoreToken equalToken, ScoreSyntaxExpr returnValue)
+public sealed class ScoreSyntaxFuncBodyImplicitReturn(ScoreSyntaxToken equalToken, ScoreSyntaxExpr returnValue)
     : ScoreSyntaxFuncBody(returnValue.Range)
 {
-    public ScoreToken EqualToken { get; } = equalToken;
+    public override string DebugNodeName { get; } = nameof(ScoreSyntaxFuncBodyImplicitReturn);
+
+    public ScoreSyntaxToken EqualToken { get; } = equalToken;
     public ScoreSyntaxExpr ReturnValue { get; } = returnValue;
     public override IEnumerable<ScoreSyntaxNode> Children { get; } = [equalToken, returnValue];
 }
@@ -80,6 +90,8 @@ public sealed class ScoreSyntaxFuncBodyImplicitReturn(ScoreToken equalToken, Sco
 public sealed class ScoreSyntaxFuncBodyCompound(ScoreSyntaxExprCompound compound)
     : ScoreSyntaxFuncBody(compound.Range)
 {
+    public override string DebugNodeName { get; } = nameof(ScoreSyntaxFuncBodyCompound);
+
     public ScoreSyntaxExprCompound Compound { get; } = compound;
     public override IEnumerable<ScoreSyntaxNode> Children { get; } = [compound];
 }

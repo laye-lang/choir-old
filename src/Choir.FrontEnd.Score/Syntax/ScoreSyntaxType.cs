@@ -10,24 +10,30 @@ public abstract class ScoreSyntaxType(SourceRange range)
 public sealed class ScoreSyntaxTypeQual(ScoreSyntaxType? underlyingSyntaxType, SourceRange range = default)
     : ScoreSyntaxNode(underlyingSyntaxType?.Range ?? range)
 {
+    public override string DebugNodeName { get; } = nameof(ScoreSyntaxTypeQual);
+
     public ScoreSyntaxType? UnderlyingSyntaxType { get; } = underlyingSyntaxType;
-    public ScoreToken? ReadAccessKeywordToken { get; init; }
+    public ScoreSyntaxToken? ReadAccessKeywordToken { get; init; }
     public override IEnumerable<ScoreSyntaxNode> Children { get; } = underlyingSyntaxType is null ? [] : [underlyingSyntaxType];
 }
 
-public sealed class ScoreSyntaxTypeBuiltin(ScoreToken typeKeywordToken)
+public sealed class ScoreSyntaxTypeBuiltin(ScoreSyntaxToken typeKeywordToken)
     : ScoreSyntaxType(typeKeywordToken.Range)
 {
-    public ScoreToken TypeKeywordToken { get; } = typeKeywordToken;
+    public override string DebugNodeName { get; } = nameof(ScoreSyntaxTypeBuiltin);
+
+    public ScoreSyntaxToken TypeKeywordToken { get; } = typeKeywordToken;
     public override IEnumerable<ScoreSyntaxNode> Children { get; } = [typeKeywordToken];
 }
 
-public sealed class ScoreSyntaxTypeBuffer(ScoreToken openSquareToken, ScoreToken starToken, ScoreToken closeSquareToken, ScoreSyntaxTypeQual elementType)
+public sealed class ScoreSyntaxTypeBuffer(ScoreSyntaxToken openSquareToken, ScoreSyntaxToken starToken, ScoreSyntaxToken closeSquareToken, ScoreSyntaxTypeQual elementType)
     : ScoreSyntaxType(new(openSquareToken.Range.Begin, elementType.Range.End))
 {
-    public ScoreToken OpenSquareToken { get; } = openSquareToken;
-    public ScoreToken StarToken { get; } = starToken;
-    public ScoreToken CloseSquareToken { get; } = closeSquareToken;
+    public override string DebugNodeName { get; } = nameof(ScoreSyntaxTypeBuffer);
+
+    public ScoreSyntaxToken OpenSquareToken { get; } = openSquareToken;
+    public ScoreSyntaxToken StarToken { get; } = starToken;
+    public ScoreSyntaxToken CloseSquareToken { get; } = closeSquareToken;
     public ScoreSyntaxTypeQual ElementType { get; } = elementType;
     public override IEnumerable<ScoreSyntaxNode> Children { get; } = [openSquareToken, starToken, closeSquareToken, elementType];
 }

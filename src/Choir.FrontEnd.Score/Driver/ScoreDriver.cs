@@ -1,5 +1,6 @@
 ﻿using Choir.Diagnostics;
 using Choir.Driver;
+using Choir.FrontEnd.Score.LanguageServer;
 using Choir.FrontEnd.Score.Syntax;
 using Choir.Source;
 
@@ -56,6 +57,9 @@ public sealed class ScoreDriver
 
     public int Execute()
     {
+        if (Options.Command == ScoreCompilerCommand.LanguageServer)
+            return LanguageServer();
+
         if (Options.Command == ScoreCompilerCommand.Format)
             return CommandFormat();
 
@@ -69,6 +73,12 @@ public sealed class ScoreDriver
         }
 
         return 0;
+    }
+
+    private int LanguageServer()
+    {
+        var ls = new ScoreLanguageServer();
+        return ls.Run();
     }
 
     private int CommandFormat()

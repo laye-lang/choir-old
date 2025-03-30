@@ -8,6 +8,7 @@ public enum ScoreCompilerCommand
     Compile,
     Run,
     Format,
+    LanguageServer,
 }
 
 public sealed class ScoreDriverOptions
@@ -34,6 +35,7 @@ public sealed class ScoreDriverOptions
 
             case "--run": Command = ScoreCompilerCommand.Run; break;
             case "--format": Command = ScoreCompilerCommand.Format; break;
+            case "--lsp" or "--language-server": Command = ScoreCompilerCommand.LanguageServer; break;
         }
     }
 }

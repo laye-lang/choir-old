@@ -31,13 +31,13 @@ public sealed class ScoreSyntaxPrinter
     {
         foreach (var child in node.Children)
         {
-            if (child is ScoreToken token)
+            if (child is ScoreSyntaxToken token)
                 PrintToken(token);
             else PrintNode(child);
         }
     }
 
-    private void PrintToken(ScoreToken token)
+    private void PrintToken(ScoreSyntaxToken token)
     {
         PrintTrivia(token.LeadingTrivia);
         _builder.Append(_unit.Source.Substring(token.Range));

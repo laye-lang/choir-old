@@ -2,6 +2,11 @@
 
 namespace Choir;
 
+public interface ITreeDebugNode
+{
+    public string DebugNodeName { get; }
+}
+
 public abstract class BaseTreeDebugVisualizer<TNode>(bool useColor)
 {
     protected readonly StringBuilder _leadingText = new(128);

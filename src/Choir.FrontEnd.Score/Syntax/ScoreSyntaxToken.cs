@@ -4,9 +4,11 @@ using Choir.Source;
 
 namespace Choir.FrontEnd.Score.Syntax;
 
-public sealed class ScoreToken(ScoreTokenKind kind, SourceRange range, ScoreTriviaList leadingTrivia, ScoreTriviaList trailingTrivia)
+public sealed class ScoreSyntaxToken(ScoreTokenKind kind, SourceRange range, ScoreTriviaList leadingTrivia, ScoreTriviaList trailingTrivia)
     : ScoreSyntaxNode(range)
 {
+    public override string DebugNodeName { get; } = nameof(ScoreSyntaxToken);
+
     public ScoreTokenKind Kind { get; } = kind;
 
     public ReadOnlyMemory<char> StringValue { get; init; }

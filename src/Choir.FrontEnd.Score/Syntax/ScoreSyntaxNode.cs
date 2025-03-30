@@ -5,6 +5,7 @@ namespace Choir.FrontEnd.Score.Syntax;
 
 public abstract class ScoreSyntaxNode(SourceRange range)
     : IEquatable<ScoreSyntaxNode>
+    , ITreeDebugNode
 {
     private static long _counter = 0;
 
@@ -13,6 +14,7 @@ public abstract class ScoreSyntaxNode(SourceRange range)
     public SourceRange Range { get; } = range;
     public SourceLocation Location { get; } = range.Begin;
 
+    public abstract string DebugNodeName { get; }
     public abstract IEnumerable<ScoreSyntaxNode> Children { get; }
 
     public ScoreSemaNode? SemaNode { get; set; }

@@ -1,13 +1,11 @@
 ﻿using Choir.Source;
 
-using static System.Net.Mime.MediaTypeNames;
-
 namespace Choir.FrontEnd.Score.Syntax;
 
 public sealed class ScoreSyntaxDebugVisualizer(SourceText source, bool useColor)
     : BaseTreeDebugVisualizer<ScoreSyntaxNode>(useColor)
 {
-    public void PrintTokens(IEnumerable<ScoreToken> tokens)
+    public void PrintTokens(IEnumerable<ScoreSyntaxToken> tokens)
     {
         SetColor(ColorBase);
         Console.WriteLine("Tokens");
@@ -24,9 +22,9 @@ public sealed class ScoreSyntaxDebugVisualizer(SourceText source, bool useColor)
     protected override void Print(ScoreSyntaxNode node)
     {
         SetColor(ColorBase);
-        Console.Write($"{node.GetType().Name} ");
+        Console.Write($"{node.DebugNodeName} ");
 
-        if (node is ScoreToken token)
+        if (node is ScoreSyntaxToken token)
             PrintToken(token);
         else if (node is ScoreTriviaList triviaList)
             PrintTriviaList(triviaList);
@@ -39,7 +37,7 @@ public sealed class ScoreSyntaxDebugVisualizer(SourceText source, bool useColor)
         PrintChildren(node.Children);
     }
 
-    private void PrintToken(ScoreToken token)
+    private void PrintToken(ScoreSyntaxToken token)
     {
         SetColor(ColorProperty);
         Console.Write(token.Kind);
