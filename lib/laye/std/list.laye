@@ -1,0 +1,47 @@
+module std;
+
+import libc;
+
+template<TElem>
+struct list {
+    TElem[*] elements;
+    int count;
+    int capacity;
+}
+
+template<TElem>
+export void ensure_capacity(list<TElem> mut* l, int min_capacity) {
+    if (min_capacity <= 0) {
+        min_capacity = 1;
+    }
+
+    if (l.capacity >= min_capacity) {
+        return;
+    }
+
+    int new_capacity = l.capacity;
+    if (l.capacity == 0) {
+        if (min_capacity > 16) {
+            new_capacity = min_capacity;
+        } else {
+            new_capacity = 16;
+        }
+    }
+
+    while (new_capacity < min_capacity) {
+        new_capacity = new_capacity * 2;
+    }
+
+    l.elements = libc::realloc(cast(int8[*]) l->elements, new_capacity);
+    l.capacity = new_capacity;
+}
+
+template<TElem>
+export void push(list<TElem> mut* l, TElem elem) {
+    ensure_capacity(l, l.count + 1);
+    assert l.elements ~= nil, "elements should not be nil";
+    assert l.capacity > 0, "capacity should not be 0";
+    assert l.capacity > l.count, "capacity should be greater than count";
+    l.elements[l.count] = elem;
+    l.count++;
+}

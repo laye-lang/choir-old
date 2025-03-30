@@ -645,7 +645,7 @@ public sealed class ModuleDeserializer : IDisposable
                     throw new UnreachableException();
                 }
 
-                case SerializedDeclKind.Function: forwardDecl = new SemaDeclFunction(location, declName); break;
+                case SerializedDeclKind.Function: forwardDecl = new SemaDeclFunction(location, declName) { Scope = null! }; break;
                 case SerializedDeclKind.Struct: forwardDecl = new SemaDeclStruct(location, declName)
                 {
                     ParentStruct = null,

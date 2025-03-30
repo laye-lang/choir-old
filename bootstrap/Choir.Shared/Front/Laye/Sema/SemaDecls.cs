@@ -42,6 +42,8 @@ public sealed class SemaDeclParam(Location location, string name, bool isRefPara
 public sealed class SemaDeclFunction(Location location, string name)
     : SemaDeclNamed(location, name)
 {
+    public required Scope Scope { get; init; }
+
     public SemaTypeQual ReturnType { get; set; } = SemaTypePoison.Instance.Qualified(Location.Nowhere);
     public IReadOnlyList<SemaDeclParam> ParameterDecls { get; set; } = [];
     public SemaDeclTemplateParameters? TemplateParameters { get; set; }

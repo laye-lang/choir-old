@@ -54,10 +54,23 @@ public partial class Sema
 
         foreach (var unitDecl in unitDecls)
         {
-            context.Assert(sema._fileImports.ContainsKey(unitDecl.SourceFile), $"No file import table found for this unit's source file ('{unitDecl.SourceFile.FilePath}').");
-            context.Assert(sema._fileScopes.ContainsKey(unitDecl.SourceFile), $"No file scope found for this unit's source file ('{unitDecl.SourceFile.FilePath}').");
-            context.Assert(sema._scopeStack.Count == 1 && sema.CurrentScope == module.ModuleScope, "Sema should be at module scope right now.");
+            var fileScope = sema._fileScopes[unitDecl.SourceFile];
+            using var _ = sema.EnterScope(fileScope);
 
+            sema._currentFileImports = sema._fileImports[unitDecl.SourceFile];
+
+            foreach (var topLevelNode in unitDecl.TopLevelDeclarations)
+            {
+                sema.PopulateForwardDeclarationIfAvailable(topLevelNode);
+            }
+
+            sema._currentFileImports = [];
+        }
+
+        if (module.Context.HasIssuedError) return;
+
+        foreach (var unitDecl in unitDecls)
+        {
             var fileScope = sema._fileScopes[unitDecl.SourceFile];
             using var _ = sema.EnterScope(fileScope);
 
@@ -304,6 +317,7 @@ public partial class Sema
                 attribs = declFunction.Attribs;
                 forwardDecl = new SemaDeclFunction(declFunction.Location, functionName)
                 {
+                    Scope = new Scope(scope),
                     IsDiscardable = declFunction.Attribs.Any(a => a is SyntaxAttribDiscardable),
                     IsInline = declFunction.Attribs.Any(a => a is SyntaxAttribInline),
                     VarargsKind = declFunction.VarargsKind,
@@ -335,6 +349,45 @@ public partial class Sema
         DeclareInScope(forwardDecl, declaringScope);
 
         return true;
+    }
+
+    private void PopulateForwardDeclarationIfAvailable(SyntaxNode decl)
+    {
+        if (!_forwardDeclNodes.TryGetValue(decl, out var forwardDecl))
+            return;
+
+        switch (decl)
+        {
+            case SyntaxDeclStruct declStruct:
+            {
+                Context.Assert(forwardDecl is SemaDeclStruct, declStruct.Location, "struct declaration did not have sema node of struct type");
+                var semaNode = (SemaDeclStruct)forwardDecl;
+
+                AnalyseStruct(declStruct, semaNode);
+            } break;
+
+            case SyntaxDeclFunction declFunction:
+            {
+                var semaNode = (SemaDeclFunction)forwardDecl;
+                using var _s = EnterScope(semaNode.Scope);
+
+                semaNode.ReturnType = AnalyseType(declFunction.ReturnType);
+
+                var paramDecls = new List<SemaDeclParam>();
+                foreach (var param in declFunction.Params)
+                {
+                    var paramType = AnalyseType(param.ParamType);
+                    var paramDecl = new SemaDeclParam(param.Location, param.TokenName.TextValue, param.IsRefParam, paramType);
+                    DeclareInScope(paramDecl);
+                    paramDecls.Add(paramDecl);
+                }
+
+                if (declFunction.VarargsKind == VarargsKind.Laye && paramDecls.Count > 0 && paramDecls[^1].IsRefParam)
+                    Context.Diag.Error(paramDecls[^1].Location, "A variadic parameter may not be marked as 'ref'.");
+
+                semaNode.ParameterDecls = [.. paramDecls];
+            } break;
+        }
     }
 
     private SemaDecl AnalyseTopLevelDecl(SyntaxNode decl)
@@ -387,7 +440,7 @@ public partial class Sema
                 Context.Assert(semaNodeCheck is SemaDeclStruct, declStruct.Location, "struct declaration did not have sema node of struct type");
                 var semaNode = (SemaDeclStruct)semaNodeCheck;
 
-                AnalyseStruct(declStruct, semaNode);
+                //AnalyseStruct(declStruct, semaNode);
                 return semaNode;
             }
 
@@ -462,31 +515,14 @@ public partial class Sema
 
             case SyntaxDeclFunction declFunction:
             {
-                using var _s = EnterScope();
-
                 if (!_forwardDeclNodes.TryGetValue(stmt, out var semaNodeCheck))
                     Context.Unreachable("Function declarations should have been forward declared.");
 
                 Context.Assert(semaNodeCheck is SemaDeclFunction, declFunction.Location, "function declaration did not have sema node of function type");
                 var semaNode = (SemaDeclFunction)semaNodeCheck;
 
+                using var _s = EnterScope(semaNode.Scope);
                 using var _f = EnterFunction(semaNode);
-
-                semaNode.ReturnType = AnalyseType(declFunction.ReturnType);
-
-                var paramDecls = new List<SemaDeclParam>();
-                foreach (var param in declFunction.Params)
-                {
-                    var paramType = AnalyseType(param.ParamType);
-                    var paramDecl = new SemaDeclParam(param.Location, param.TokenName.TextValue, param.IsRefParam, paramType);
-                    DeclareInScope(paramDecl);
-                    paramDecls.Add(paramDecl);
-                }
-
-                if (declFunction.VarargsKind == VarargsKind.Laye && paramDecls.Count > 0 && paramDecls[^1].IsRefParam)
-                    Context.Diag.Error(paramDecls[^1].Location, "A variadic parameter may not be marked as 'ref'.");
-
-                semaNode.ParameterDecls = [.. paramDecls];
 
                 if (declFunction.Body is SyntaxCompound bodyCompound)
                 {
@@ -1220,7 +1256,8 @@ public partial class Sema
         }
         else
         {
-            Context.Diag.Error(index.Location, $"Cannot index value of type {operand.Type.ToDebugString(Colors)}.");
+            if (!operand.Type.IsPoison)
+                Context.Diag.Error(index.Location, $"Cannot index value of type {operand.Type.ToDebugString(Colors)}.");
             return new SemaExprIndexInvalid(operand, [])
             {
                 ValueCategory = ValueCategory.LValue
@@ -1354,7 +1391,8 @@ public partial class Sema
         }
         else
         {
-            Context.Diag.Error(index.Location, $"Cannot index value of type {operand.Type.ToDebugString(Colors)}.");
+            if (!operand.Type.IsPoison)
+                Context.Diag.Error(index.Location, $"Cannot index value of type {operand.Type.ToDebugString(Colors)}.");
             return new SemaExprIndexInvalid(operand, indices)
             {
                 ValueCategory = ValueCategory.LValue
@@ -2207,6 +2245,9 @@ public partial class Sema
 
         if (operand.Type.IsPoison)
             return new SemaExprFieldBadIndex(field.Location, operand, fieldName);
+
+        if (operand.Type.CanonicalType.Type is SemaTypePointer { ElementType.CanonicalType.Type: SemaTypeStruct })
+            ImplicitDereference(ref operand);
 
         switch (operand.Type.CanonicalType.Type)
         {
