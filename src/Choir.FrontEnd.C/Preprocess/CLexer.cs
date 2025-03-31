@@ -38,7 +38,7 @@ public sealed class CLexer
     private bool _isAtStartOfLine = true;
 
     private bool IsAtEnd => _readPosition >= _source.Text.Length;
-    private char CurrentCharacter => PeekCharacterAndStride(0, out int _);
+    private char CurrentCharacter => PeekCharacterAndStride(0, LexerState.None, out int _);
     private SourceLocation CurrentLocation => new(_readPosition);
 
     private CLexer(CCContext context, SourceText source)
@@ -47,13 +47,15 @@ public sealed class CLexer
         _source = source;
     }
 
-    private void Advance(int amount = 1)
+    private void Advance(int amount = 1) => Advance(amount, LexerState.None);
+    private void Advance(LexerState state) => Advance(1, state);
+    private void Advance(int amount, LexerState state)
     {
-        _context.Assert(amount >= 1, $"Parameter {nameof(amount)} to function {nameof(CLexerNaive)}::{nameof(Advance)} must be positive; advancing the lexer must always move forward at least one character if possible.");
+        _context.Assert(amount >= 1, $"Parameter {nameof(amount)} to function {nameof(CLexer)}::{nameof(Advance)} must be positive; advancing the lexer must always move forward at least one character if possible.");
         
         for (int i = 0; i < amount && !IsAtEnd; i++)
         {
-            char c = PeekCharacterAndStride(0, out int stride);
+            char c = PeekCharacterAndStride(0, state, out int stride);
             if (c is '\n') _isAtStartOfLine = true;
             _readPosition += stride;
         }
@@ -61,19 +63,19 @@ public sealed class CLexer
         _readPosition = Math.Min(_readPosition, _source.Text.Length);
     }
 
-    private bool TryAdvance(char c)
+    private bool TryAdvance(char c, LexerState state = LexerState.None)
     {
         if (CurrentCharacter != c)
             return false;
 
-        Advance();
+        Advance(state);
         return true;
     }
 
-    private char PeekCharacter(int ahead = 0) => PeekCharacterAndStride(ahead, out int _);
-    private char PeekCharacterAndStride(int ahead, out int stride)
+    private char PeekCharacter(int ahead, LexerState state = LexerState.None) => PeekCharacterAndStride(ahead, state, out int _);
+    private char PeekCharacterAndStride(int ahead, LexerState state, out int stride)
     {
-        _context.Assert(ahead >= 0, $"Parameter {nameof(ahead)} to function {nameof(CLexerNaive)}::{nameof(PeekCharacterAndStride)} must be non-negative; the lexer should never rely on character look-back.");
+        _context.Assert(ahead >= 0, $"Parameter {nameof(ahead)} to function {nameof(CLexer)}::{nameof(PeekCharacterAndStride)} must be non-negative; the lexer should never rely on character look-back.");
 
         int internalOffset = 0;
         for (int i = 0; i < ahead; i++)
@@ -198,7 +200,7 @@ public sealed class CLexer
                 default: return new(trivia, isLeading);
             }
 
-            _context.Assert(_readPosition > beginLocation.Offset, _source, beginLocation, $"{nameof(CLexerNaive)}::{nameof(ReadTokenNoPreprocess)} failed to consume any non-trivia characters from the source text and did not return the current list of trivia if required.");
+            _context.Assert(_readPosition > beginLocation.Offset, _source, beginLocation, $"{nameof(CLexer)}::{nameof(ReadTokenNoPreprocess)} failed to consume any non-trivia characters from the source text and did not return the current list of trivia if required.");
         }
 
         // end of file broke us out of the loop; simply return what we read.
@@ -457,8 +459,8 @@ public sealed class CLexer
         }
 
         var tokenRange = GetRange(beginLocation);
-        _context.Assert(_readPosition > beginLocation.Offset, _source, beginLocation, $"{nameof(CLexerNaive)}::{nameof(ReadTokenNoPreprocess)} failed to consume any non-trivia characters from the source text and did not return an EOF token.");
-        _context.Assert(tokenKind != CPPTokenKind.Invalid, _source, beginLocation, $"{nameof(CLexerNaive)}::{nameof(ReadTokenNoPreprocess)} failed to assign a non-invalid kind to the read token.");
+        _context.Assert(_readPosition > beginLocation.Offset, _source, beginLocation, $"{nameof(CLexer)}::{nameof(ReadTokenNoPreprocess)} failed to consume any non-trivia characters from the source text and did not return an EOF token.");
+        _context.Assert(tokenKind != CPPTokenKind.Invalid, _source, beginLocation, $"{nameof(CLexer)}::{nameof(ReadTokenNoPreprocess)} failed to assign a non-invalid kind to the read token.");
 
         var trailingTrivia = ReadTrivia(isLeading: false, state);
         return new(tokenKind, tokenRange, leadingTrivia, trailingTrivia)
