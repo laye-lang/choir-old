@@ -18,7 +18,7 @@ public sealed class ScoreSyntaxToken(ScoreTokenKind kind, SourceRange range, Sco
     public ScoreTriviaList LeadingTrivia { get; } = leadingTrivia;
     public ScoreTriviaList TrailingTrivia { get; } = trailingTrivia;
 
-    public override IEnumerable<ScoreSyntaxNode> Children
+    public override IEnumerable<ITreeDebugNode> Children
     {
         get
         {

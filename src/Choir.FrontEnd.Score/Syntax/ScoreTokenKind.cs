@@ -36,7 +36,7 @@ public enum ScoreTokenKind
     CloseCurly = '}',
     Tilde = '~',
 
-    EndOfFile = 256,
+    EndOfFile = 255,
     UnexpectedCharacter,
     Missing,
 

@@ -229,7 +229,7 @@ public sealed class ScoreLexer
         return new(trivia, isLeading);
     }
 
-    public ScoreSyntaxToken ReadToken()
+    private ScoreSyntaxToken ReadToken()
     {
         var leadingTrivia = ReadTrivia(isLeading: true);
         var beginLocation = CurrentLocation;

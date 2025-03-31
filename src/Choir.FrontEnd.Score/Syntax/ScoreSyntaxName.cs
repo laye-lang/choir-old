@@ -41,7 +41,7 @@ public sealed class ScoreSyntaxNameIdentifier(ScoreSyntaxToken identifierToken)
 
     public ScoreSyntaxToken IdentifierToken { get; } = identifierToken;
     public ReadOnlyMemory<char> Spelling => IdentifierToken.StringValue;
-    public override IEnumerable<ScoreSyntaxNode> Children { get; } = [identifierToken];
+    public override IEnumerable<ITreeDebugNode> Children { get; } = [identifierToken];
 }
 
 public sealed class ScoreSyntaxNameOperator(OverloadableOperator @operator, IReadOnlyList<ScoreSyntaxToken> operatorTokens)
@@ -51,7 +51,7 @@ public sealed class ScoreSyntaxNameOperator(OverloadableOperator @operator, IRea
 
     public OverloadableOperator Operator { get; } = @operator;
     public IReadOnlyList<ScoreSyntaxToken> OperatorTokens { get; } = operatorTokens;
-    public override IEnumerable<ScoreSyntaxNode> Children { get; } = operatorTokens;
+    public override IEnumerable<ITreeDebugNode> Children { get; } = operatorTokens;
 }
 
 public sealed class ScoreSyntaxNameOperatorCast(ScoreSyntaxToken castKeywordToken, ScoreSyntaxToken openParenToken, ScoreSyntaxTypeQual castType, ScoreSyntaxToken closeParenToken)
@@ -63,5 +63,5 @@ public sealed class ScoreSyntaxNameOperatorCast(ScoreSyntaxToken castKeywordToke
     public ScoreSyntaxToken OpenParenToken { get; } = openParenToken;
     public ScoreSyntaxTypeQual CastType { get; } = castType;
     public ScoreSyntaxToken CloseParenToken { get; } = closeParenToken;
-    public override IEnumerable<ScoreSyntaxNode> Children { get; } = [castKeywordToken, openParenToken, castType, closeParenToken];
+    public override IEnumerable<ITreeDebugNode> Children { get; } = [castKeywordToken, openParenToken, castType, closeParenToken];
 }

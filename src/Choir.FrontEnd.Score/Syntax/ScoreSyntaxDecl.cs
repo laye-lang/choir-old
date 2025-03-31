@@ -34,7 +34,7 @@ public sealed class ScoreSyntaxDeclFunc(ScoreSyntaxToken funcKeywordToken, Score
     { 
     }
 
-    public override IEnumerable<ScoreSyntaxNode> Children { get; } = [funcKeywordToken, funcName, openParenToken, declParams, closeParenToken,
+    public override IEnumerable<ITreeDebugNode> Children { get; } = [funcKeywordToken, funcName, openParenToken, declParams, closeParenToken,
         .. new ScoreSyntaxNode?[] { arrowToken, returnType }.Where(n => n is not null).Cast<ScoreSyntaxNode>(), funcBody];
 }
 
@@ -46,7 +46,7 @@ public class ScoreSyntaxDeclFuncParams(List<ScoreSyntaxDeclFuncParam> declParams
     public List<ScoreSyntaxDeclFuncParam> DeclParams { get; } = declParams;
     public List<ScoreSyntaxToken> CommaTokens { get; } = commaTokens;
 
-    public override IEnumerable<ScoreSyntaxNode> Children { get; } = declParams
+    public override IEnumerable<ITreeDebugNode> Children { get; } = declParams
         .Select(p => (p.Range, Node: (ScoreSyntaxNode)p))
         .Concat(commaTokens.Select(p => (p.Range, Node: (ScoreSyntaxNode)p)))
         .OrderBy(pair => pair.Range)
@@ -60,7 +60,7 @@ public class ScoreSyntaxDeclFuncParam(ScoreSyntaxName paramName, ScoreSyntaxToke
 
     public ScoreSyntaxToken ColonToken { get; } = colonToken;
     public ScoreSyntaxTypeQual ParamType { get; } = paramType;
-    public override IEnumerable<ScoreSyntaxNode> Children { get; } = [paramName, colonToken, paramType];
+    public override IEnumerable<ITreeDebugNode> Children { get; } = [paramName, colonToken, paramType];
 }
 
 public abstract class ScoreSyntaxFuncBody(SourceRange range)
@@ -74,7 +74,7 @@ public sealed class ScoreSyntaxFuncBodyEmpty(ScoreSyntaxToken semiColonToken)
     public override string DebugNodeName { get; } = nameof(ScoreSyntaxFuncBodyEmpty);
 
     public ScoreSyntaxToken SemiColonToken { get; } = semiColonToken;
-    public override IEnumerable<ScoreSyntaxNode> Children { get; } = [semiColonToken];
+    public override IEnumerable<ITreeDebugNode> Children { get; } = [semiColonToken];
 }
 
 public sealed class ScoreSyntaxFuncBodyImplicitReturn(ScoreSyntaxToken equalToken, ScoreSyntaxExpr returnValue)
@@ -84,7 +84,7 @@ public sealed class ScoreSyntaxFuncBodyImplicitReturn(ScoreSyntaxToken equalToke
 
     public ScoreSyntaxToken EqualToken { get; } = equalToken;
     public ScoreSyntaxExpr ReturnValue { get; } = returnValue;
-    public override IEnumerable<ScoreSyntaxNode> Children { get; } = [equalToken, returnValue];
+    public override IEnumerable<ITreeDebugNode> Children { get; } = [equalToken, returnValue];
 }
 
 public sealed class ScoreSyntaxFuncBodyCompound(ScoreSyntaxExprCompound compound)
@@ -93,5 +93,5 @@ public sealed class ScoreSyntaxFuncBodyCompound(ScoreSyntaxExprCompound compound
     public override string DebugNodeName { get; } = nameof(ScoreSyntaxFuncBodyCompound);
 
     public ScoreSyntaxExprCompound Compound { get; } = compound;
-    public override IEnumerable<ScoreSyntaxNode> Children { get; } = [compound];
+    public override IEnumerable<ITreeDebugNode> Children { get; } = [compound];
 }

@@ -5,9 +5,10 @@ namespace Choir;
 public interface ITreeDebugNode
 {
     public string DebugNodeName { get; }
+    public IEnumerable<ITreeDebugNode> Children { get; }
 }
 
-public abstract class BaseTreeDebugVisualizer<TNode>(bool useColor)
+public abstract class BaseTreeDebugVisualizer(bool useColor)
 {
     protected readonly StringBuilder _leadingText = new(128);
 
@@ -24,9 +25,9 @@ public abstract class BaseTreeDebugVisualizer<TNode>(bool useColor)
         if (useColor) Console.ForegroundColor = color;
     }
 
-    protected abstract void Print(TNode node);
+    protected abstract void Print(ITreeDebugNode node);
 
-    protected virtual void PrintChildren(IEnumerable<TNode> children)
+    protected virtual void PrintChildren(IEnumerable<ITreeDebugNode> children)
     {
         if (!children.Any()) return;
 

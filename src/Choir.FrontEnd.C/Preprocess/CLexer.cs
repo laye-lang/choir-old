@@ -1,0 +1,481 @@
+﻿using System.Text;
+
+using Choir.FrontEnd.C.Diagnostics;
+using Choir.Source;
+
+namespace Choir.FrontEnd.C.Preprocess;
+
+public sealed class CLexer
+{
+    [Flags]
+    private enum LexerState
+    {
+        None = 0,
+        WithinDirective,
+        HasHeaderNames,
+    }
+
+    public static List<CPPToken> ReadTokens(CCContext context, SourceText source)
+    {
+        var lexer = new CLexer(context, source);
+        var tokens = new List<CPPToken>();
+
+        while (true)
+        {
+            lexer.ReadManyTokensInto(tokens);
+            if (lexer.IsAtEnd)
+                break;
+        }
+
+        context.Diag.Flush();
+        return tokens;
+    }
+
+    private readonly CCContext _context;
+    private readonly SourceText _source;
+
+    private int _readPosition;
+    private bool _isAtStartOfLine = true;
+
+    private bool IsAtEnd => _readPosition >= _source.Text.Length;
+    private char CurrentCharacter => PeekCharacterAndStride(0, out int _);
+    private SourceLocation CurrentLocation => new(_readPosition);
+
+    private CLexer(CCContext context, SourceText source)
+    {
+        _context = context;
+        _source = source;
+    }
+
+    private void Advance(int amount = 1)
+    {
+        _context.Assert(amount >= 1, $"Parameter {nameof(amount)} to function {nameof(CLexerNaive)}::{nameof(Advance)} must be positive; advancing the lexer must always move forward at least one character if possible.");
+        
+        for (int i = 0; i < amount && !IsAtEnd; i++)
+        {
+            char c = PeekCharacterAndStride(0, out int stride);
+            if (c is '\n') _isAtStartOfLine = true;
+            _readPosition += stride;
+        }
+
+        _readPosition = Math.Min(_readPosition, _source.Text.Length);
+    }
+
+    private bool TryAdvance(char c)
+    {
+        if (CurrentCharacter != c)
+            return false;
+
+        Advance();
+        return true;
+    }
+
+    private char PeekCharacter(int ahead = 0) => PeekCharacterAndStride(ahead, out int _);
+    private char PeekCharacterAndStride(int ahead, out int stride)
+    {
+        _context.Assert(ahead >= 0, $"Parameter {nameof(ahead)} to function {nameof(CLexerNaive)}::{nameof(PeekCharacterAndStride)} must be non-negative; the lexer should never rely on character look-back.");
+
+        int internalOffset = 0;
+        for (int i = 0; i < ahead; i++)
+        {
+            char _ = PeekCharacterInternal(internalOffset, out int advance);
+            internalOffset += advance;
+        }
+
+        return PeekCharacterInternal(internalOffset, out stride);
+
+        char PeekCharacterInternal(int at, out int stride)
+        {
+            stride = 1;
+            char c = SafePeekSingleChar(at);
+
+            switch (c)
+            {
+                case '\\' when SafePeekSingleChar(at + 1) is '\n' && SafePeekSingleChar(at + 2) == '\r':
+                case '\\' when SafePeekSingleChar(at + 1) is '\r' && SafePeekSingleChar(at + 2) == '\n':
+                {
+                    stride = 4;
+                    return SafePeekSingleChar(at + 3);
+                }
+                
+                case '\\' when SafePeekSingleChar(at + 1) is '\n' or '\r':
+                {
+                    stride = 3;
+                    return SafePeekSingleChar(at + 2);
+                }
+
+                case '\n' when SafePeekSingleChar(at + 1) is '\r':
+                case '\r' when SafePeekSingleChar(at + 1) is '\n':
+                {
+                    stride = 2;
+                    return '\n';
+                }
+
+                default: return c;
+            }
+        }
+
+        char SafePeekSingleChar(int at)
+        {
+            int peekIndex = _readPosition + at;
+            if (peekIndex >= _source.Text.Length)
+                return '\0';
+
+            return _source.Text[peekIndex];
+        }
+    }
+
+    private SourceRange GetRange(SourceLocation beginLocation) => new(beginLocation, CurrentLocation);
+
+    private CTriviaList ReadTrivia(bool isLeading, LexerState state)
+    {
+        if (IsAtEnd) return new([], isLeading);
+
+        var trivia = new List<CTrivia>(2);
+        while (!IsAtEnd)
+        {
+            var beginLocation = CurrentLocation;
+            switch (CurrentCharacter)
+            {
+                // the character peeker automatically transforms all forms of newline to just \n, so this one case should grab all valid newlines the lexer recognizes.
+                case '\n' when !state.HasFlag(LexerState.WithinDirective):
+                {
+                    Advance();
+                    trivia.Add(new CTriviaNewLine(GetRange(beginLocation)));
+                    // Trailing trivia always ends with a newline if encountered.
+                    if (!isLeading) return new(trivia, isLeading);
+                } break;
+
+                case ' ' or '\t' or '\v':
+                {
+                    Advance();
+                    while (!IsAtEnd && CurrentCharacter is ' ' or '\t' or '\v')
+                        Advance();
+                    trivia.Add(new CTriviaWhiteSpace(GetRange(beginLocation)));
+                } break;
+
+                case '/' when PeekCharacter(1) == '/':
+                {
+                    Advance(2);
+                    while (!IsAtEnd && CurrentCharacter is not ('\r' or '\n'))
+                        Advance();
+                    trivia.Add(new CTriviaLineComment(GetRange(beginLocation)));
+                } break;
+
+                case '/' when PeekCharacter(1) == '*':
+                {
+                    Advance(2);
+
+                    bool isClosed = false;
+                    while (!isClosed && !IsAtEnd)
+                    {
+                        if (CurrentCharacter == '*' && PeekCharacter(1) == '/')
+                        {
+                            Advance(2);
+                            isClosed = true;
+                            break;
+                        }
+                        else Advance();
+                    }
+
+                    if (!isClosed)
+                        _context.ErrorUnclosedComment(_source, beginLocation);
+
+                    trivia.Add(new CTriviaDelimitedComment(GetRange(beginLocation)));
+                } break;
+
+                // A shebang, `#!`, at the very start of the file is treated as a line comment.
+                // This allows running C files as scripts on Unix systems without also making `#` or `#!` line comment sequences anywhere else.
+                case '#' when _readPosition == 0 && PeekCharacter(1) == '!':
+                {
+                    Advance(2);
+                    while (!IsAtEnd && CurrentCharacter is not ('\r' or '\n'))
+                        Advance();
+                    trivia.Add(new CTriviaShebangComment(GetRange(beginLocation)));
+                } break;
+
+                // when nothing matches, there is no trivia to read; simply return what we currently have.
+                default: return new(trivia, isLeading);
+            }
+
+            _context.Assert(_readPosition > beginLocation.Offset, _source, beginLocation, $"{nameof(CLexerNaive)}::{nameof(ReadTokenNoPreprocess)} failed to consume any non-trivia characters from the source text and did not return the current list of trivia if required.");
+        }
+
+        // end of file broke us out of the loop; simply return what we read.
+        return new(trivia, isLeading);
+    }
+
+    private void ReadManyTokensInto(List<CPPToken> tokens)
+    {
+        var firstToken = ReadTokenNoPreprocess();
+        tokens.Add(firstToken);
+
+        if (firstToken is { Kind: CPPTokenKind.Pound, IsAtStartOfLine: true })
+        {
+            var secondToken = ReadTokenNoPreprocess();
+            tokens.Add(secondToken);
+
+            switch (secondToken)
+            {
+                case { Kind: CPPTokenKind.Identifier } when secondToken.StringValue == "include":
+                {
+                    ReadDirectiveTokensInto(tokens, LexerState.HasHeaderNames);
+                } break;
+
+                default: break;
+            }
+        }
+    }
+
+    private CPPToken ReadTokenNoPreprocess(LexerState state = LexerState.None)
+    {
+        var leadingTrivia = ReadTrivia(isLeading: true, state);
+        var beginLocation = CurrentLocation;
+
+        // once we start lexing a token, it's the only token that's considered at the start of its line.
+        // store the current state of the start-of-line flag, and set it to false for all subsequent tokens.
+        // the trivia lexer will reset it to true when a "real" newline is encountered.
+        bool isAtStartOfLine = _isAtStartOfLine;
+        _isAtStartOfLine = false;
+
+        if (IsAtEnd)
+        {
+            return new(CPPTokenKind.EndOfFile, GetRange(beginLocation), leadingTrivia, new([], false))
+            {
+                // probably doesn't matter, but hey let's track it anyway.
+                IsAtStartOfLine = isAtStartOfLine,
+            };
+        }
+        
+        StringView stringValue = default;
+
+        var tokenKind = CPPTokenKind.Invalid;
+        switch (CurrentCharacter)
+        {
+            case '\n' when state.HasFlag(LexerState.WithinDirective):
+            {
+                Advance();
+                tokenKind = CPPTokenKind.DirectiveEnd;
+            } break;
+
+            case '<' when state.HasFlag(LexerState.HasHeaderNames):
+            {
+                var tokenTextBuilder = new StringBuilder();
+                tokenKind = CPPTokenKind.HeaderName;
+
+                Advance();
+                while (!IsAtEnd && CurrentCharacter is not '>')
+                {
+                    tokenTextBuilder.Append(CurrentCharacter);
+                    Advance();
+                }
+
+                if (!TryAdvance('>'))
+                    _context.ErrorExpectedMatchingCloseDelimiter(_source, '<', '>', CurrentLocation, beginLocation);
+
+                stringValue = tokenTextBuilder.ToString();
+            } break;
+
+            case '(': Advance(); tokenKind = CPPTokenKind.OpenParen; break;
+            case ')': Advance(); tokenKind = CPPTokenKind.CloseParen; break;
+            case '[': Advance(); tokenKind = CPPTokenKind.OpenSquare; break;
+            case ']': Advance(); tokenKind = CPPTokenKind.CloseSquare; break;
+            case '{': Advance(); tokenKind = CPPTokenKind.OpenCurly; break;
+            case '}': Advance(); tokenKind = CPPTokenKind.CloseCurly; break;
+            case ';': Advance(); tokenKind = CPPTokenKind.SemiColon; break;
+            case '?': Advance(); tokenKind = CPPTokenKind.Question; break;
+            case '~': Advance(); tokenKind = CPPTokenKind.Tilde; break;
+
+            case '!':
+            {
+                Advance();
+                if (TryAdvance('='))
+                    tokenKind = CPPTokenKind.BangEqual;
+                else tokenKind = CPPTokenKind.Bang;
+            } break;
+
+            case '#':
+            {
+                Advance();
+                if (TryAdvance('#'))
+                    tokenKind = CPPTokenKind.PoundPound;
+                else tokenKind = CPPTokenKind.Pound;
+            } break;
+
+            case '%':
+            {
+                Advance();
+                if (TryAdvance('='))
+                    tokenKind = CPPTokenKind.PercentEqual;
+                else tokenKind = CPPTokenKind.Percent;
+            } break;
+
+            case '&':
+            {
+                Advance();
+                if (TryAdvance('&'))
+                    tokenKind = CPPTokenKind.AmpersandAmpersand;
+                else if (TryAdvance('='))
+                    tokenKind = CPPTokenKind.AmpersandEqual;
+                else tokenKind = CPPTokenKind.Ampersand;
+            } break;
+
+            case '*':
+            {
+                Advance();
+                if (TryAdvance('='))
+                    tokenKind = CPPTokenKind.StarEqual;
+                else tokenKind = CPPTokenKind.Star;
+            } break;
+
+            case '+':
+            {
+                Advance();
+                if (TryAdvance('+'))
+                    tokenKind = CPPTokenKind.PlusPlus;
+                else if (TryAdvance('='))
+                    tokenKind = CPPTokenKind.PlusEqual;
+                else tokenKind = CPPTokenKind.Plus;
+            } break;
+
+            case '-':
+            {
+                Advance();
+                if (TryAdvance('-'))
+                    tokenKind = CPPTokenKind.MinusMinus;
+                else if (TryAdvance('='))
+                    tokenKind = CPPTokenKind.MinusEqual;
+                else if (TryAdvance('>'))
+                    tokenKind = CPPTokenKind.MinusGreater;
+                else tokenKind = CPPTokenKind.Minus;
+            } break;
+
+            case '.':
+            {
+                Advance();
+                if (CurrentCharacter is '.' && PeekCharacter(1) is '.')
+                {
+                    Advance(2);
+                    tokenKind = CPPTokenKind.DotDotDot;
+                }
+                else tokenKind = CPPTokenKind.Dot;
+            } break;
+
+            case '/':
+            {
+                Advance();
+                if (TryAdvance('='))
+                    tokenKind = CPPTokenKind.SlashEqual;
+                else tokenKind = CPPTokenKind.Slash;
+            } break;
+
+            case ':':
+            {
+                Advance();
+                if (TryAdvance(':'))
+                    tokenKind = CPPTokenKind.ColonColon;
+                else tokenKind = CPPTokenKind.Colon;
+            } break;
+
+            case '<':
+            {
+                Advance();
+                if (TryAdvance('='))
+                    tokenKind = CPPTokenKind.LessEqual;
+                else if (TryAdvance('<'))
+                {
+                    if (TryAdvance('='))
+                        tokenKind = CPPTokenKind.LessLessEqual;
+                    else tokenKind = CPPTokenKind.LessLess;
+                }
+                else tokenKind = CPPTokenKind.Less;
+            } break;
+
+            case '=':
+            {
+                Advance();
+                if (TryAdvance('='))
+                    tokenKind = CPPTokenKind.EqualEqual;
+                else tokenKind = CPPTokenKind.Equal;
+            } break;
+
+            case '>':
+            {
+                Advance();
+                if (TryAdvance('='))
+                    tokenKind = CPPTokenKind.GreaterEqual;
+                else if (TryAdvance('>'))
+                {
+                    if (TryAdvance('='))
+                        tokenKind = CPPTokenKind.GreaterGreaterEqual;
+                    else tokenKind = CPPTokenKind.GreaterGreater;
+                }
+                else tokenKind = CPPTokenKind.Greater;
+            } break;
+
+            case '^':
+            {
+                Advance();
+                if (TryAdvance('='))
+                    tokenKind = CPPTokenKind.CaretEqual;
+                else tokenKind = CPPTokenKind.Caret;
+            } break;
+
+            case '|':
+            {
+                Advance();
+                if (TryAdvance('|'))
+                    tokenKind = CPPTokenKind.PipePipe;
+                else if (TryAdvance('='))
+                    tokenKind = CPPTokenKind.PipeEqual;
+                else tokenKind = CPPTokenKind.Pipe;
+            } break;
+
+            case '_' or (>= 'a' and <= 'z') or (>= 'A' and <= 'Z'):
+            {
+                var tokenTextBuilder = new StringBuilder();
+                tokenTextBuilder.Append(CurrentCharacter);
+
+                tokenKind = CPPTokenKind.Identifier;
+
+                Advance();
+                while (CurrentCharacter is '_' or (>= 'a' and <= 'z') or (>= 'A' and <= 'Z') or (>= '0' and <= '9'))
+                {
+                    tokenTextBuilder.Append(CurrentCharacter);
+                    Advance();
+                }
+
+                stringValue = tokenTextBuilder.ToString();
+            } break;
+
+            default:
+            {
+                _context.ErrorUnexpectedCharacter(_source, beginLocation);
+                tokenKind = CPPTokenKind.UnexpectedCharacter;
+                Advance();
+            } break;
+        }
+
+        var tokenRange = GetRange(beginLocation);
+        _context.Assert(_readPosition > beginLocation.Offset, _source, beginLocation, $"{nameof(CLexerNaive)}::{nameof(ReadTokenNoPreprocess)} failed to consume any non-trivia characters from the source text and did not return an EOF token.");
+        _context.Assert(tokenKind != CPPTokenKind.Invalid, _source, beginLocation, $"{nameof(CLexerNaive)}::{nameof(ReadTokenNoPreprocess)} failed to assign a non-invalid kind to the read token.");
+
+        var trailingTrivia = ReadTrivia(isLeading: false, state);
+        return new(tokenKind, tokenRange, leadingTrivia, trailingTrivia)
+        {
+            StringValue = stringValue,
+            IsAtStartOfLine = isAtStartOfLine,
+        };
+    }
+
+    private void ReadDirectiveTokensInto(List<CPPToken> tokens, LexerState directiveState = LexerState.None)
+    {
+        directiveState |= LexerState.WithinDirective;
+        while (!IsAtEnd && ReadTokenNoPreprocess(directiveState) is { } token)
+        {
+            tokens.Add(token);
+            if (token.Kind is CPPTokenKind.DirectiveEnd)
+                break;
+        }
+    }
+}

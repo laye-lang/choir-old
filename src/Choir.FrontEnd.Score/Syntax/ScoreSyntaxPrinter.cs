@@ -27,7 +27,7 @@ public sealed class ScoreSyntaxPrinter
         return _builder.ToString();
     }
 
-    private void PrintNode(ScoreSyntaxNode node)
+    private void PrintNode(ITreeDebugNode node)
     {
         foreach (var child in node.Children)
         {

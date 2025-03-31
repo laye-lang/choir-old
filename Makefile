@@ -58,3 +58,7 @@ score:
 .PHONY: clean
 clean:
 	rm -rf out
+	rm -rf src/Choir/bin src/Choir/out
+	rm -rf src/Choir.FrontEnd.C/bin src/Choir.FrontEnd.C/out
+	rm -rf src/Choir.FrontEnd.Laye/bin src/Choir.FrontEnd.Laye/out
+	rm -rf src/Choir.FrontEnd.Score/bin src/Choir.FrontEnd.Score/out

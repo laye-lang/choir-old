@@ -14,7 +14,7 @@ public sealed class ScoreSyntaxTypeQual(ScoreSyntaxType? underlyingSyntaxType, S
 
     public ScoreSyntaxType? UnderlyingSyntaxType { get; } = underlyingSyntaxType;
     public ScoreSyntaxToken? ReadAccessKeywordToken { get; init; }
-    public override IEnumerable<ScoreSyntaxNode> Children { get; } = underlyingSyntaxType is null ? [] : [underlyingSyntaxType];
+    public override IEnumerable<ITreeDebugNode> Children { get; } = underlyingSyntaxType is null ? [] : [underlyingSyntaxType];
 }
 
 public sealed class ScoreSyntaxTypeBuiltin(ScoreSyntaxToken typeKeywordToken)
@@ -23,7 +23,7 @@ public sealed class ScoreSyntaxTypeBuiltin(ScoreSyntaxToken typeKeywordToken)
     public override string DebugNodeName { get; } = nameof(ScoreSyntaxTypeBuiltin);
 
     public ScoreSyntaxToken TypeKeywordToken { get; } = typeKeywordToken;
-    public override IEnumerable<ScoreSyntaxNode> Children { get; } = [typeKeywordToken];
+    public override IEnumerable<ITreeDebugNode> Children { get; } = [typeKeywordToken];
 }
 
 public sealed class ScoreSyntaxTypeBuffer(ScoreSyntaxToken openSquareToken, ScoreSyntaxToken starToken, ScoreSyntaxToken closeSquareToken, ScoreSyntaxTypeQual elementType)
@@ -35,5 +35,5 @@ public sealed class ScoreSyntaxTypeBuffer(ScoreSyntaxToken openSquareToken, Scor
     public ScoreSyntaxToken StarToken { get; } = starToken;
     public ScoreSyntaxToken CloseSquareToken { get; } = closeSquareToken;
     public ScoreSyntaxTypeQual ElementType { get; } = elementType;
-    public override IEnumerable<ScoreSyntaxNode> Children { get; } = [openSquareToken, starToken, closeSquareToken, elementType];
+    public override IEnumerable<ITreeDebugNode> Children { get; } = [openSquareToken, starToken, closeSquareToken, elementType];
 }

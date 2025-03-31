@@ -3,7 +3,7 @@
 namespace Choir.FrontEnd.Score.Syntax;
 
 public sealed class ScoreSyntaxDebugVisualizer(SourceText source, bool useColor)
-    : BaseTreeDebugVisualizer<ScoreSyntaxNode>(useColor)
+    : BaseTreeDebugVisualizer(useColor)
 {
     public void PrintTokens(IEnumerable<ScoreSyntaxToken> tokens)
     {
@@ -19,7 +19,7 @@ public sealed class ScoreSyntaxDebugVisualizer(SourceText source, bool useColor)
         Print(unit);
     }
 
-    protected override void Print(ScoreSyntaxNode node)
+    protected override void Print(ITreeDebugNode node)
     {
         SetColor(ColorBase);
         Console.Write($"{node.DebugNodeName} ");

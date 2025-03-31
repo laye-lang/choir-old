@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Choir.FrontEnd.C": {
+      "commandName": "Project",
+      "commandLineArgs": "C:\\Users\\Nashiora\\dev\\choir\\test\\c\\testpp.c"
+    }
+  }
+}

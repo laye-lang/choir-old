@@ -11,7 +11,7 @@ public sealed class ScoreSyntaxUnit(SourceText source, IReadOnlyList<ScoreSyntax
     public IReadOnlyList<ScoreSyntaxToken> Tokens { get; } = tokens;
     public IReadOnlyList<ScoreSyntaxNode> TopLevelNodes { get; } = topLevelNodes;
 
-    public override IEnumerable<ScoreSyntaxNode> Children { get; } = topLevelNodes;
+    public override IEnumerable<ITreeDebugNode> Children { get; } = topLevelNodes;
 }
 
 public sealed class ScoreSyntaxEndOfUnit(ScoreSyntaxToken endOfFileToken)
@@ -20,5 +20,5 @@ public sealed class ScoreSyntaxEndOfUnit(ScoreSyntaxToken endOfFileToken)
     public override string DebugNodeName { get; } = nameof(ScoreSyntaxEndOfUnit);
 
     public ScoreSyntaxToken EndOfFileToken { get; set; } = endOfFileToken;
-    public override IEnumerable<ScoreSyntaxNode> Children { get; } = [endOfFileToken];
+    public override IEnumerable<ITreeDebugNode> Children { get; } = [endOfFileToken];
 }

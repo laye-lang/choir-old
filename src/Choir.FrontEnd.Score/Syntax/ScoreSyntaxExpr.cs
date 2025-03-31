@@ -17,7 +17,7 @@ public sealed class ScoreSyntaxExprStmt(ScoreSyntaxExpr expr, ScoreSyntaxToken s
 
     public ScoreSyntaxExpr Expr { get; } = expr;
     public ScoreSyntaxToken SemiColonToken { get; } = semiColonToken;
-    public override IEnumerable<ScoreSyntaxNode> Children { get; } = [expr, semiColonToken];
+    public override IEnumerable<ITreeDebugNode> Children { get; } = [expr, semiColonToken];
 }
 
 #region Statements
@@ -30,7 +30,7 @@ public sealed class ScoreSyntaxExprReturn(ScoreSyntaxToken returnKeywordToken, S
     public ScoreSyntaxToken ReturnKeywordToken { get; } = returnKeywordToken;
     public ScoreSyntaxExpr? ReturnValue { get; } = returnValue;
     public ScoreSyntaxToken SemiColonToken { get; } = semiColonToken;
-    public override IEnumerable<ScoreSyntaxNode> Children { get; } = returnValue is null ? [returnKeywordToken, semiColonToken] : [returnKeywordToken, returnValue, semiColonToken];
+    public override IEnumerable<ITreeDebugNode> Children { get; } = returnValue is null ? [returnKeywordToken, semiColonToken] : [returnKeywordToken, returnValue, semiColonToken];
 }
 
 #endregion
@@ -43,7 +43,7 @@ public sealed class ScoreSyntaxExprLiteral(ScoreSyntaxToken literalToken)
     public override string DebugNodeName { get; } = nameof(ScoreSyntaxExprLiteral);
 
     public ScoreSyntaxToken LiteralToken { get; } = literalToken;
-    public override IEnumerable<ScoreSyntaxNode> Children { get; } = [literalToken];
+    public override IEnumerable<ITreeDebugNode> Children { get; } = [literalToken];
 }
 
 public sealed class ScoreSyntaxExprCompound(ScoreSyntaxToken openCurlyToken, IReadOnlyList<ScoreSyntaxNode> childNodes, ScoreSyntaxToken closeCurlyToken)
@@ -54,7 +54,7 @@ public sealed class ScoreSyntaxExprCompound(ScoreSyntaxToken openCurlyToken, IRe
     public ScoreSyntaxToken OpenCurlyToken { get; } = openCurlyToken;
     public IReadOnlyList<ScoreSyntaxNode> ChildNodes { get; } = childNodes;
     public ScoreSyntaxToken CloseCurlyToken { get; } = closeCurlyToken;
-    public override IEnumerable<ScoreSyntaxNode> Children { get; } = [openCurlyToken, .. childNodes, closeCurlyToken];
+    public override IEnumerable<ITreeDebugNode> Children { get; } = [openCurlyToken, .. childNodes, closeCurlyToken];
 }
 
 #endregion

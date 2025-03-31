@@ -1,5 +1,7 @@
 ﻿namespace Choir.Diagnostics;
 
+public delegate IDiagnosticConsumer DiagnosticConsumerProvider(bool useColor);
+
 public interface IDiagnosticConsumer
     : IDisposable
 {

@@ -6,8 +6,6 @@ using Choir.Source;
 
 namespace Choir.FrontEnd.Score.Driver;
 
-public delegate IDiagnosticConsumer DiagnosticConsumerProvider(bool useColor);
-
 public sealed class ScoreDriver
     : ICompilerDriver
 {
@@ -39,7 +37,7 @@ public sealed class ScoreDriver
         return driver.Execute();
     }
 
-    public static ScoreDriver Create(IDiagnosticConsumer diagConsumer, ScoreDriverOptions options, string programName = "score")
+    public static ScoreDriver Create(IDiagnosticConsumer diagConsumer, ScoreDriverOptions options, string programName = "chscore")
     {
         return new ScoreDriver(programName, diagConsumer, options);
     }

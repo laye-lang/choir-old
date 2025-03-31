@@ -14,7 +14,7 @@ public abstract class ScoreSemaNode(SourceRange range)
     public SourceLocation Location { get; } = range.Begin;
 
     public abstract string DebugNodeName { get; }
-    public abstract IEnumerable<ScoreSemaNode> Children { get; }
+    public abstract IEnumerable<ITreeDebugNode> Children { get; }
 
     public override int GetHashCode() => HashCode.Combine(Id);
 
