@@ -70,7 +70,7 @@ public readonly struct StringView(ReadOnlyMemory<char> memory, int hashCode)
             if (Span[i] != s[i])
                 return false;
         }
-
+        
         return true;
     }
 

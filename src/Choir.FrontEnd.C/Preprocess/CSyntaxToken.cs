@@ -12,4 +12,7 @@ public sealed class CSyntaxToken(CTokenKind kind, SourceText source, SourceRange
 
     public CTriviaList LeadingTrivia { get; } = leadingTrivia;
     public CTriviaList TrailingTrivia { get; } = trailingTrivia;
+
+    public bool IsMacroParam { get; set; }
+    public int MacroParamIndex { get; set; }
 }

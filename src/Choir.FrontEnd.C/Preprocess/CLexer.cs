@@ -159,7 +159,7 @@ public sealed class CLexer
                 case '/' when PeekCharacter(1) == '/':
                 {
                     Advance(2);
-                    while (!IsAtEnd && CurrentCharacter is not ('\r' or '\n'))
+                    while (!IsAtEnd && CurrentCharacter is not '\n')
                         Advance();
                     trivia.Add(new CTriviaLineComment(GetRange(beginLocation)));
                 } break;
