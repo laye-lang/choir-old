@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.Diagnostics;
+using System.Text;
 
 using Choir.FrontEnd.C.Diagnostics;
 using Choir.Source;
@@ -15,17 +16,19 @@ public sealed class CLexer
         HasHeaderNames,
     }
 
-    public static List<CPPToken> ReadTokens(CCContext context, SourceText source)
+    public static List<CToken> ReadTokens(CCContext context, SourceText source)
     {
         var lexer = new CLexer(context, source);
-        var tokens = new List<CPPToken>();
+        var tokens = new List<CToken>();
 
         while (true)
         {
             lexer.ReadManyTokensInto(tokens);
-            if (lexer.IsAtEnd)
+            if (tokens[^1].Kind is CTokenKind.EndOfFile)
                 break;
         }
+
+        Debug.Assert(tokens.Count == 0 || tokens[^1].Kind == CTokenKind.EndOfFile);
 
         context.Diag.Flush();
         return tokens;
@@ -207,29 +210,32 @@ public sealed class CLexer
         return new(trivia, isLeading);
     }
 
-    private void ReadManyTokensInto(List<CPPToken> tokens)
+    private void ReadManyTokensInto(List<CToken> tokens)
     {
         var firstToken = ReadTokenNoPreprocess();
         tokens.Add(firstToken);
 
-        if (firstToken is { Kind: CPPTokenKind.Pound, IsAtStartOfLine: true })
+        if (firstToken is { Kind: CTokenKind.Pound, IsAtStartOfLine: true })
         {
             var secondToken = ReadTokenNoPreprocess();
             tokens.Add(secondToken);
 
             switch (secondToken)
             {
-                case { Kind: CPPTokenKind.Identifier } when secondToken.StringValue == "include":
+                case { Kind: CTokenKind.Identifier } when secondToken.StringValue == "include":
                 {
                     ReadDirectiveTokensInto(tokens, LexerState.HasHeaderNames);
                 } break;
 
-                default: break;
+                default:
+                {
+                    ReadDirectiveTokensInto(tokens);
+                } break;
             }
         }
     }
 
-    private CPPToken ReadTokenNoPreprocess(LexerState state = LexerState.None)
+    private CToken ReadTokenNoPreprocess(LexerState state = LexerState.None)
     {
         var leadingTrivia = ReadTrivia(isLeading: true, state);
         var beginLocation = CurrentLocation;
@@ -242,7 +248,7 @@ public sealed class CLexer
 
         if (IsAtEnd)
         {
-            return new(CPPTokenKind.EndOfFile, GetRange(beginLocation), leadingTrivia, new([], false))
+            return new(CTokenKind.EndOfFile, _source, GetRange(beginLocation), leadingTrivia, new([], false))
             {
                 // probably doesn't matter, but hey let's track it anyway.
                 IsAtStartOfLine = isAtStartOfLine,
@@ -251,19 +257,19 @@ public sealed class CLexer
         
         StringView stringValue = default;
 
-        var tokenKind = CPPTokenKind.Invalid;
+        var tokenKind = CTokenKind.Invalid;
         switch (CurrentCharacter)
         {
             case '\n' when state.HasFlag(LexerState.WithinDirective):
             {
                 Advance();
-                tokenKind = CPPTokenKind.DirectiveEnd;
+                tokenKind = CTokenKind.DirectiveEnd;
             } break;
 
             case '<' when state.HasFlag(LexerState.HasHeaderNames):
             {
                 var tokenTextBuilder = new StringBuilder();
-                tokenKind = CPPTokenKind.HeaderName;
+                tokenKind = CTokenKind.HeaderName;
 
                 Advance();
                 while (!IsAtEnd && CurrentCharacter is not '>')
@@ -278,78 +284,78 @@ public sealed class CLexer
                 stringValue = tokenTextBuilder.ToString();
             } break;
 
-            case '(': Advance(); tokenKind = CPPTokenKind.OpenParen; break;
-            case ')': Advance(); tokenKind = CPPTokenKind.CloseParen; break;
-            case '[': Advance(); tokenKind = CPPTokenKind.OpenSquare; break;
-            case ']': Advance(); tokenKind = CPPTokenKind.CloseSquare; break;
-            case '{': Advance(); tokenKind = CPPTokenKind.OpenCurly; break;
-            case '}': Advance(); tokenKind = CPPTokenKind.CloseCurly; break;
-            case ';': Advance(); tokenKind = CPPTokenKind.SemiColon; break;
-            case '?': Advance(); tokenKind = CPPTokenKind.Question; break;
-            case '~': Advance(); tokenKind = CPPTokenKind.Tilde; break;
+            case '(': Advance(); tokenKind = CTokenKind.OpenParen; break;
+            case ')': Advance(); tokenKind = CTokenKind.CloseParen; break;
+            case '[': Advance(); tokenKind = CTokenKind.OpenSquare; break;
+            case ']': Advance(); tokenKind = CTokenKind.CloseSquare; break;
+            case '{': Advance(); tokenKind = CTokenKind.OpenCurly; break;
+            case '}': Advance(); tokenKind = CTokenKind.CloseCurly; break;
+            case ';': Advance(); tokenKind = CTokenKind.SemiColon; break;
+            case '?': Advance(); tokenKind = CTokenKind.Question; break;
+            case '~': Advance(); tokenKind = CTokenKind.Tilde; break;
 
             case '!':
             {
                 Advance();
                 if (TryAdvance('='))
-                    tokenKind = CPPTokenKind.BangEqual;
-                else tokenKind = CPPTokenKind.Bang;
+                    tokenKind = CTokenKind.BangEqual;
+                else tokenKind = CTokenKind.Bang;
             } break;
 
             case '#':
             {
                 Advance();
                 if (TryAdvance('#'))
-                    tokenKind = CPPTokenKind.PoundPound;
-                else tokenKind = CPPTokenKind.Pound;
+                    tokenKind = CTokenKind.PoundPound;
+                else tokenKind = CTokenKind.Pound;
             } break;
 
             case '%':
             {
                 Advance();
                 if (TryAdvance('='))
-                    tokenKind = CPPTokenKind.PercentEqual;
-                else tokenKind = CPPTokenKind.Percent;
+                    tokenKind = CTokenKind.PercentEqual;
+                else tokenKind = CTokenKind.Percent;
             } break;
 
             case '&':
             {
                 Advance();
                 if (TryAdvance('&'))
-                    tokenKind = CPPTokenKind.AmpersandAmpersand;
+                    tokenKind = CTokenKind.AmpersandAmpersand;
                 else if (TryAdvance('='))
-                    tokenKind = CPPTokenKind.AmpersandEqual;
-                else tokenKind = CPPTokenKind.Ampersand;
+                    tokenKind = CTokenKind.AmpersandEqual;
+                else tokenKind = CTokenKind.Ampersand;
             } break;
 
             case '*':
             {
                 Advance();
                 if (TryAdvance('='))
-                    tokenKind = CPPTokenKind.StarEqual;
-                else tokenKind = CPPTokenKind.Star;
+                    tokenKind = CTokenKind.StarEqual;
+                else tokenKind = CTokenKind.Star;
             } break;
 
             case '+':
             {
                 Advance();
                 if (TryAdvance('+'))
-                    tokenKind = CPPTokenKind.PlusPlus;
+                    tokenKind = CTokenKind.PlusPlus;
                 else if (TryAdvance('='))
-                    tokenKind = CPPTokenKind.PlusEqual;
-                else tokenKind = CPPTokenKind.Plus;
+                    tokenKind = CTokenKind.PlusEqual;
+                else tokenKind = CTokenKind.Plus;
             } break;
 
             case '-':
             {
                 Advance();
                 if (TryAdvance('-'))
-                    tokenKind = CPPTokenKind.MinusMinus;
+                    tokenKind = CTokenKind.MinusMinus;
                 else if (TryAdvance('='))
-                    tokenKind = CPPTokenKind.MinusEqual;
+                    tokenKind = CTokenKind.MinusEqual;
                 else if (TryAdvance('>'))
-                    tokenKind = CPPTokenKind.MinusGreater;
-                else tokenKind = CPPTokenKind.Minus;
+                    tokenKind = CTokenKind.MinusGreater;
+                else tokenKind = CTokenKind.Minus;
             } break;
 
             case '.':
@@ -358,79 +364,79 @@ public sealed class CLexer
                 if (CurrentCharacter is '.' && PeekCharacter(1) is '.')
                 {
                     Advance(2);
-                    tokenKind = CPPTokenKind.DotDotDot;
+                    tokenKind = CTokenKind.DotDotDot;
                 }
-                else tokenKind = CPPTokenKind.Dot;
+                else tokenKind = CTokenKind.Dot;
             } break;
 
             case '/':
             {
                 Advance();
                 if (TryAdvance('='))
-                    tokenKind = CPPTokenKind.SlashEqual;
-                else tokenKind = CPPTokenKind.Slash;
+                    tokenKind = CTokenKind.SlashEqual;
+                else tokenKind = CTokenKind.Slash;
             } break;
 
             case ':':
             {
                 Advance();
                 if (TryAdvance(':'))
-                    tokenKind = CPPTokenKind.ColonColon;
-                else tokenKind = CPPTokenKind.Colon;
+                    tokenKind = CTokenKind.ColonColon;
+                else tokenKind = CTokenKind.Colon;
             } break;
 
             case '<':
             {
                 Advance();
                 if (TryAdvance('='))
-                    tokenKind = CPPTokenKind.LessEqual;
+                    tokenKind = CTokenKind.LessEqual;
                 else if (TryAdvance('<'))
                 {
                     if (TryAdvance('='))
-                        tokenKind = CPPTokenKind.LessLessEqual;
-                    else tokenKind = CPPTokenKind.LessLess;
+                        tokenKind = CTokenKind.LessLessEqual;
+                    else tokenKind = CTokenKind.LessLess;
                 }
-                else tokenKind = CPPTokenKind.Less;
+                else tokenKind = CTokenKind.Less;
             } break;
 
             case '=':
             {
                 Advance();
                 if (TryAdvance('='))
-                    tokenKind = CPPTokenKind.EqualEqual;
-                else tokenKind = CPPTokenKind.Equal;
+                    tokenKind = CTokenKind.EqualEqual;
+                else tokenKind = CTokenKind.Equal;
             } break;
 
             case '>':
             {
                 Advance();
                 if (TryAdvance('='))
-                    tokenKind = CPPTokenKind.GreaterEqual;
+                    tokenKind = CTokenKind.GreaterEqual;
                 else if (TryAdvance('>'))
                 {
                     if (TryAdvance('='))
-                        tokenKind = CPPTokenKind.GreaterGreaterEqual;
-                    else tokenKind = CPPTokenKind.GreaterGreater;
+                        tokenKind = CTokenKind.GreaterGreaterEqual;
+                    else tokenKind = CTokenKind.GreaterGreater;
                 }
-                else tokenKind = CPPTokenKind.Greater;
+                else tokenKind = CTokenKind.Greater;
             } break;
 
             case '^':
             {
                 Advance();
                 if (TryAdvance('='))
-                    tokenKind = CPPTokenKind.CaretEqual;
-                else tokenKind = CPPTokenKind.Caret;
+                    tokenKind = CTokenKind.CaretEqual;
+                else tokenKind = CTokenKind.Caret;
             } break;
 
             case '|':
             {
                 Advance();
                 if (TryAdvance('|'))
-                    tokenKind = CPPTokenKind.PipePipe;
+                    tokenKind = CTokenKind.PipePipe;
                 else if (TryAdvance('='))
-                    tokenKind = CPPTokenKind.PipeEqual;
-                else tokenKind = CPPTokenKind.Pipe;
+                    tokenKind = CTokenKind.PipeEqual;
+                else tokenKind = CTokenKind.Pipe;
             } break;
 
             case '_' or (>= 'a' and <= 'z') or (>= 'A' and <= 'Z'):
@@ -438,7 +444,7 @@ public sealed class CLexer
                 var tokenTextBuilder = new StringBuilder();
                 tokenTextBuilder.Append(CurrentCharacter);
 
-                tokenKind = CPPTokenKind.Identifier;
+                tokenKind = CTokenKind.Identifier;
 
                 Advance();
                 while (CurrentCharacter is '_' or (>= 'a' and <= 'z') or (>= 'A' and <= 'Z') or (>= '0' and <= '9'))
@@ -453,30 +459,30 @@ public sealed class CLexer
             default:
             {
                 _context.ErrorUnexpectedCharacter(_source, beginLocation);
-                tokenKind = CPPTokenKind.UnexpectedCharacter;
+                tokenKind = CTokenKind.UnexpectedCharacter;
                 Advance();
             } break;
         }
 
         var tokenRange = GetRange(beginLocation);
         _context.Assert(_readPosition > beginLocation.Offset, _source, beginLocation, $"{nameof(CLexer)}::{nameof(ReadTokenNoPreprocess)} failed to consume any non-trivia characters from the source text and did not return an EOF token.");
-        _context.Assert(tokenKind != CPPTokenKind.Invalid, _source, beginLocation, $"{nameof(CLexer)}::{nameof(ReadTokenNoPreprocess)} failed to assign a non-invalid kind to the read token.");
+        _context.Assert(tokenKind != CTokenKind.Invalid, _source, beginLocation, $"{nameof(CLexer)}::{nameof(ReadTokenNoPreprocess)} failed to assign a non-invalid kind to the read token.");
 
         var trailingTrivia = ReadTrivia(isLeading: false, state);
-        return new(tokenKind, tokenRange, leadingTrivia, trailingTrivia)
+        return new(tokenKind, _source, tokenRange, leadingTrivia, trailingTrivia)
         {
             StringValue = stringValue,
             IsAtStartOfLine = isAtStartOfLine,
         };
     }
 
-    private void ReadDirectiveTokensInto(List<CPPToken> tokens, LexerState directiveState = LexerState.None)
+    private void ReadDirectiveTokensInto(List<CToken> tokens, LexerState directiveState = LexerState.None)
     {
         directiveState |= LexerState.WithinDirective;
         while (!IsAtEnd && ReadTokenNoPreprocess(directiveState) is { } token)
         {
             tokens.Add(token);
-            if (token.Kind is CPPTokenKind.DirectiveEnd)
+            if (token.Kind is CTokenKind.DirectiveEnd)
                 break;
         }
     }

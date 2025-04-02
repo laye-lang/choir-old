@@ -4,10 +4,14 @@ public enum CTokenKind
 {
     Invalid,
 
+    HeaderName,
     Identifier,
+    PPNumber,
     Number,
     LiteralCharacter,
     LiteralString,
+
+    DirectiveEnd,
 
     Bang = '!',
     Pound = '#',
@@ -49,6 +53,7 @@ public enum CTokenKind
     PlusPlus,
     PlusEqual,
     MinusMinus,
+    MinusEqual,
     MinusGreater,
     DotDotDot,
     SlashEqual,
@@ -64,5 +69,12 @@ public enum CTokenKind
     PipePipe,
     PipeEqual,
 
+    UnexpectedCharacter = 254,
     EndOfFile = 255,
+}
+
+public static class CTokenKindExtensions
+{
+    public static bool IsPunctuator(this CTokenKind kind) =>
+        kind is >= CTokenKind.Bang and < CTokenKind.UnexpectedCharacter;
 }

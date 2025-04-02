@@ -66,6 +66,19 @@ public sealed class CDriver
                     Console.Error.Write($" ({t.StringValue})");
                 Console.Error.WriteLine();
             }
+
+            Console.Error.WriteLine("----");
+
+            var macroStore = new CPPMacroStore();
+            var tokens = CPreprocessor.PreprocessTokens(Context, macroStore, source, ppTokens);
+
+            foreach (var t in tokens)
+            {
+                Console.Error.Write($"{t.Kind} <{t.Location.Offset}> '{source.Substring(t.Range)}'");
+                if (t.StringValue.Length > 0)
+                    Console.Error.Write($" ({t.StringValue})");
+                Console.Error.WriteLine();
+            }
         }
 
         return 0;
