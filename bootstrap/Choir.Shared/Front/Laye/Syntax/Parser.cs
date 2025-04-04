@@ -339,8 +339,23 @@ public partial class Parser(SourceFile sourceFile)
         Context.Assert(At(TokenKind.Module), CurrentLocation, $"Should only call {nameof(ParseModuleDeclaration)} at a `module` token.");
         Consume(TokenKind.Module, out var tokenModule);
         var tokenName = ExpectIdentifier();
+        if (TryAdvance(TokenKind.SemiColon))
+            return new SyntaxDeclModule(tokenModule, [tokenName]);
+
+        var tokenNames = new List<SyntaxToken>(4) { tokenName };
+        while (TryAdvance(TokenKind.ColonColon))
+        {
+            if (!Consume(TokenKind.Identifier, out var identToken))
+            {
+                Context.Diag.Error(CurrentToken.Location, $"expected an identifier.");
+                break;
+            }
+
+            tokenNames.Add(identToken);
+        }
+
         ExpectSemiColon();
-        return new SyntaxDeclModule(tokenModule, tokenName);
+        return new SyntaxDeclModule(tokenModule, tokenNames);
     }
 
     public SyntaxDeclModuleUnitHeader ParseModuleUnitHeader()
@@ -372,6 +387,27 @@ public partial class Parser(SourceFile sourceFile)
             return ParseImportDeclaration();
         }
 
+        SyntaxTargetCondition? targetCondition = null;
+        if (TryAdvance(TokenKind.HashSquare, out var hashSquareToken))
+        {
+            var targetToken = ExpectIdentifier();
+            if (targetToken.TextValue != "target")
+                Context.Diag.Error(CurrentLocation, "Expected 'target'."); ;
+
+            SyntaxToken targetStringToken;
+            if (!Consume(TokenKind.OpenParen))
+            {
+                Context.Diag.Error(CurrentLocation, "Expected '('.");
+                targetStringToken = new SyntaxToken(TokenKind.Missing, CurrentLocation);
+            }
+            else targetStringToken = Expect(TokenKind.LiteralString, "a string literal.");
+
+            Expect(TokenKind.CloseParen, "')'");
+            Expect(TokenKind.CloseBracket, "']'");
+
+            targetCondition = new SyntaxTargetCondition(targetToken, targetStringToken);
+        }
+
         SyntaxTemplateParams? templateParams = null;
         if (TryAdvance(TokenKind.Template, out var tokenTemplate))
             templateParams = ParseTemplateParams(tokenTemplate);
@@ -385,19 +421,19 @@ public partial class Parser(SourceFile sourceFile)
 
             case TokenKind.Alias:
             case TokenKind.Identifier when CurrentToken.TextValue == "strict" && PeekAt(1, TokenKind.Alias):
-                return ParseAliasDeclaration(templateParams, attribs);
+                return ParseAliasDeclaration(templateParams, targetCondition, attribs);
                 
             case TokenKind.Struct:
-                return ParseStructDeclaration(templateParams, attribs, null);
+                return ParseStructDeclaration(templateParams, targetCondition, attribs, null);
 
             case TokenKind.Enum:
-                return ParseEnumDeclaration(templateParams, attribs, null);
+                return ParseEnumDeclaration(templateParams, targetCondition, attribs, null);
 
             case TokenKind.Register:
             {
                 if (templateParams is not null)
                     Context.Diag.Error(templateParams.Location, "Register declarations cannot be tempalted.");
-                return ParseRegisterDeclaration(attribs);
+                return ParseRegisterDeclaration(targetCondition, attribs);
             }
                 
             case TokenKind.Identifier when CurrentToken.TextValue == "static" && PeekAt(1, TokenKind.If):
@@ -429,7 +465,7 @@ public partial class Parser(SourceFile sourceFile)
 #endif
 
                 var declType = ParseType();
-                return ParseBindingOrFunctionDeclStartingAtName(templateParams, attribs, declType);
+                return ParseBindingOrFunctionDeclStartingAtName(templateParams, targetCondition, attribs, declType);
             }
         }
     }
@@ -624,7 +660,7 @@ public partial class Parser(SourceFile sourceFile)
         };
     }
 
-    private SyntaxDeclAlias ParseAliasDeclaration(SyntaxTemplateParams? templateParams, IReadOnlyList<SyntaxAttrib> attribs)
+    private SyntaxDeclAlias ParseAliasDeclaration(SyntaxTemplateParams? templateParams, SyntaxTargetCondition? targetCondition, IReadOnlyList<SyntaxAttrib> attribs)
     {
         Context.Assert(At(TokenKind.Alias) || At("strict") && PeekAt(1, TokenKind.Alias), CurrentLocation, $"{nameof(ParseAliasDeclaration)} called when not at 'alias' or 'strict alias'.");
 
@@ -638,11 +674,12 @@ public partial class Parser(SourceFile sourceFile)
         return new SyntaxDeclAlias(tokenStrict, tokenAlias, tokenName, type)
         {
             TemplateParams = templateParams,
+            TargetCondition = targetCondition,
             Attribs = attribs,
         };
     }
 
-    private SyntaxDeclStruct ParseStructDeclaration(SyntaxTemplateParams? templateParams, IReadOnlyList<SyntaxAttrib> attribs, SyntaxToken? tokenError)
+    private SyntaxDeclStruct ParseStructDeclaration(SyntaxTemplateParams? templateParams, SyntaxTargetCondition? targetCondition, IReadOnlyList<SyntaxAttrib> attribs, SyntaxToken? tokenError)
     {
         Context.Assert(At(TokenKind.Struct, TokenKind.Variant), CurrentLocation, $"{nameof(ParseStructDeclaration)} called when not at 'struct' or 'variant'.");
 
@@ -662,12 +699,12 @@ public partial class Parser(SourceFile sourceFile)
                     var tokenVariant = Consume();
                     var tokenVoid = Consume();
                     ExpectSemiColon();
-                    var variant = new SyntaxDeclStruct(tokenVariant, tokenVoid, [], []) { TemplateParams = null, Attribs = [] };
+                    var variant = new SyntaxDeclStruct(tokenVariant, tokenVoid, [], []) { TargetCondition = null, TemplateParams = null, Attribs = [] };
                     variants.Add(variant);
                 }
                 else
                 {
-                    var variant = ParseStructDeclaration(null, [], null);
+                    var variant = ParseStructDeclaration(null, null, [], null);
                     variants.Add(variant);
                 }
 
@@ -686,6 +723,7 @@ public partial class Parser(SourceFile sourceFile)
         return new SyntaxDeclStruct(tokenStructOrVariant, tokenName, [.. fields], [.. variants])
         {
             TemplateParams = templateParams,
+            TargetCondition = targetCondition,
             Attribs = attribs,
         };
     }
@@ -702,7 +740,7 @@ public partial class Parser(SourceFile sourceFile)
         return new SyntaxDeclEnumVariant(tokenName, null);
     }
 
-    private SyntaxDeclEnum ParseEnumDeclaration(SyntaxTemplateParams? templateParams, IReadOnlyList<SyntaxAttrib> attribs, SyntaxToken? tokenError)
+    private SyntaxDeclEnum ParseEnumDeclaration(SyntaxTemplateParams? templateParams, SyntaxTargetCondition? targetCondition, IReadOnlyList<SyntaxAttrib> attribs, SyntaxToken? tokenError)
     {
         Context.Assert(At(TokenKind.Enum), CurrentLocation, $"{nameof(ParseEnumDeclaration)} called when not at 'enum'.");
 
@@ -724,11 +762,12 @@ public partial class Parser(SourceFile sourceFile)
         return new SyntaxDeclEnum(tokenEnum, tokenName, variants)
         {
             TemplateParams = templateParams,
+            TargetCondition = targetCondition,
             Attribs = attribs,
         };
     }
 
-    private SyntaxDeclRegister ParseRegisterDeclaration(IReadOnlyList<SyntaxAttrib> attribs)
+    private SyntaxDeclRegister ParseRegisterDeclaration(SyntaxTargetCondition? targetCondition, IReadOnlyList<SyntaxAttrib> attribs)
     {
         Context.Assert(At(TokenKind.Register), CurrentLocation, $"{nameof(ParseRegisterDeclaration)} called when not at 'register'.");
 
@@ -740,19 +779,20 @@ public partial class Parser(SourceFile sourceFile)
 
         return new SyntaxDeclRegister(tokenRegister, tokenRegisterName, registerType, tokenDeclName)
         {
-            Attribs = attribs
+            TargetCondition = targetCondition,
+            Attribs = attribs,
         };
     }
 
-    private SyntaxNode ParseBindingOrFunctionDeclStartingAtName(SyntaxTemplateParams? templateParams, IReadOnlyList<SyntaxAttrib> attribs, SyntaxNode declType)
+    private SyntaxNode ParseBindingOrFunctionDeclStartingAtName(SyntaxTemplateParams? templateParams, SyntaxTargetCondition? targetCondition, IReadOnlyList<SyntaxAttrib> attribs, SyntaxNode declType)
     {
         if (At(TokenKind.Operator) || PeekAt(1, TokenKind.OpenParen))
-            return ParseFunctionDeclStartingAtName(templateParams, attribs, declType);
+            return ParseFunctionDeclStartingAtName(templateParams, targetCondition, attribs, declType);
             
-        return ParseBindingDeclStartingAtName(templateParams, attribs, declType, true);
+        return ParseBindingDeclStartingAtName(templateParams, targetCondition, attribs, declType, true);
     }
 
-    private SyntaxDeclBinding ParseBindingDeclStartingAtName(SyntaxTemplateParams? templateParams, IReadOnlyList<SyntaxAttrib> attribs, SyntaxNode bindingType, bool consumeSemi)
+    private SyntaxDeclBinding ParseBindingDeclStartingAtName(SyntaxTemplateParams? templateParams, SyntaxTargetCondition? targetCondition, IReadOnlyList<SyntaxAttrib> attribs, SyntaxNode bindingType, bool consumeSemi)
     {
         ExpectIdentifier(out var tokenName);
 
@@ -767,6 +807,7 @@ public partial class Parser(SourceFile sourceFile)
         return new SyntaxDeclBinding(bindingType, tokenName, tokenAssign, initializer, tokenSemiColon)
         {
             TemplateParams = templateParams,
+            TargetCondition = targetCondition,
             Attribs = attribs,
         };
     }
@@ -779,7 +820,7 @@ public partial class Parser(SourceFile sourceFile)
         return new SyntaxDeclParam(refToken, paramType, tokenName);
     }
 
-    private SyntaxDeclFunction ParseFunctionDeclStartingAtName(SyntaxTemplateParams? templateParams, IReadOnlyList<SyntaxAttrib> attribs, SyntaxNode returnType)
+    private SyntaxDeclFunction ParseFunctionDeclStartingAtName(SyntaxTemplateParams? templateParams, SyntaxTargetCondition? targetCondition, IReadOnlyList<SyntaxAttrib> attribs, SyntaxNode returnType)
     {
         var name = ParseIdentifierOrOperatorName();
         Expect(TokenKind.OpenParen, "'('");
@@ -842,6 +883,7 @@ public partial class Parser(SourceFile sourceFile)
             return new SyntaxDeclFunction(returnType, name, paramDecls)
             {
                 TemplateParams = templateParams,
+                TargetCondition = targetCondition,
                 Attribs = attribs,
                 Body = body,
             };
@@ -851,13 +893,14 @@ public partial class Parser(SourceFile sourceFile)
         return new SyntaxDeclFunction(returnType, name, paramDecls)
         {
             TemplateParams = templateParams,
+            TargetCondition = targetCondition,
             Attribs = attribs,
             TokenSemiColon = tokenSemiColon,
             VarargsKind = varargsKind,
         };
     }
 
-    private SyntaxDeclFunction ParseFunctionDeclStartingWithinParameters(SyntaxTemplateParams? templateParams, IReadOnlyList<SyntaxAttrib> attribs, SyntaxNode returnType, SyntaxToken tokenName, SyntaxToken? refToken, SyntaxNode firstParamType)
+    private SyntaxDeclFunction ParseFunctionDeclStartingWithinParameters(SyntaxTemplateParams? templateParams, SyntaxTargetCondition? targetCondition, IReadOnlyList<SyntaxAttrib> attribs, SyntaxNode returnType, SyntaxToken tokenName, SyntaxToken? refToken, SyntaxNode firstParamType)
     {
         Consume(TokenKind.Identifier, out var tokenFirstParamName);
 
@@ -879,6 +922,7 @@ public partial class Parser(SourceFile sourceFile)
             return new SyntaxDeclFunction(returnType, tokenName, paramDecls)
             {
                 TemplateParams = templateParams,
+                TargetCondition = targetCondition,
                 Attribs = attribs,
                 Body = body,
             };
@@ -888,6 +932,7 @@ public partial class Parser(SourceFile sourceFile)
         return new SyntaxDeclFunction(returnType, tokenName, paramDecls)
         {
             TemplateParams = templateParams,
+            TargetCondition = targetCondition,
             Attribs = attribs,
             TokenSemiColon = tokenSemiColon,
         };
@@ -917,7 +962,7 @@ public partial class Parser(SourceFile sourceFile)
         if (IsDefinitelyTypeStart(CurrentToken.Kind))
         {
             var declType = ParseType();
-            return ParseBindingOrFunctionDeclStartingAtName(null, [], declType);
+            return ParseBindingOrFunctionDeclStartingAtName(null, null, [], declType);
         }
 
         switch (CurrentToken.Kind)
@@ -957,7 +1002,7 @@ public partial class Parser(SourceFile sourceFile)
 
                 if (syntax.IsDecl) return syntax;
                 if (syntax.CanBeType && At(TokenKind.Identifier))
-                    return ParseBindingOrFunctionDeclStartingAtName(null, [], syntax);
+                    return ParseBindingOrFunctionDeclStartingAtName(null, null, [], syntax);
 
                 return ParseStmtContinue(syntax, true);
             }
@@ -1075,7 +1120,7 @@ public partial class Parser(SourceFile sourceFile)
 
                     if (initializer.IsDecl) {}
                     else if (initializer.CanBeType && At(TokenKind.Identifier))
-                        initializer = ParseBindingDeclStartingAtName(null, [], initializer, false);
+                        initializer = ParseBindingDeclStartingAtName(null, null, [], initializer, false);
                     else if (CurrentToken.Kind.IsAssignmentOperator())
                         initializer = ParseStmtContinue(initializer, false);
                 }
@@ -2112,7 +2157,7 @@ public partial class Parser(SourceFile sourceFile)
                 {
                     // this is now a binding declaration
                     SyntaxNode bindingType = CreateTypeNodeFromOperator(lhs, tokenOperator);
-                    return ParseBindingDeclStartingAtName(null, [], bindingType, parseContext != ExprParseContext.CheckForDeclarations);
+                    return ParseBindingDeclStartingAtName(null, null, [], bindingType, parseContext != ExprParseContext.CheckForDeclarations);
                 }
 
                 if (parseContext == ExprParseContext.CheckForDeclarations && At(TokenKind.Identifier) && PeekAt(1, TokenKind.OpenParen))
@@ -2122,7 +2167,7 @@ public partial class Parser(SourceFile sourceFile)
                     {
                         // this is a function declaration/definition with no parameters
                         SyntaxNode returnType = CreateTypeNodeFromOperator(lhs, tokenOperator);
-                        return ParseFunctionDeclStartingAtName(null, [], returnType);
+                        return ParseFunctionDeclStartingAtName(null, null, [], returnType);
                     }
 
                     if (IsDefinitelyTypeStart(Peek(2).Kind) || (PeekAt(2, TokenKind.Ref) && IsDefinitelyTypeStart(Peek(3).Kind)))
@@ -2131,7 +2176,7 @@ public partial class Parser(SourceFile sourceFile)
                         // within the open paren *must* start a type (or is ref and the token
                         // after *must* start a type.)
                         SyntaxNode returnType = CreateTypeNodeFromOperator(lhs, tokenOperator);
-                        return ParseFunctionDeclStartingAtName(null, [], returnType);
+                        return ParseFunctionDeclStartingAtName(null, null, [], returnType);
                     }
 
                     Consume(TokenKind.Identifier, out var tokenIdent);
@@ -2144,7 +2189,7 @@ public partial class Parser(SourceFile sourceFile)
                     {
                         // this should be a parameter declaration
                         SyntaxNode returnType = CreateTypeNodeFromOperator(lhs, tokenOperator);
-                        return ParseFunctionDeclStartingWithinParameters(null, [], returnType, tokenIdent, null, firstParamOrArg);
+                        return ParseFunctionDeclStartingWithinParameters(null, null, [], returnType, tokenIdent, null, firstParamOrArg);
                     }
 
                     // otherwise we give up, it's an invocation on the RHS
@@ -2156,7 +2201,7 @@ public partial class Parser(SourceFile sourceFile)
                 {
                     // this is an operator overload declaration/definition
                     SyntaxNode returnType = CreateTypeNodeFromOperator(lhs, tokenOperator);
-                    return ParseFunctionDeclStartingAtName(null, [], returnType);
+                    return ParseFunctionDeclStartingAtName(null, null, [], returnType);
                 }
             }
             

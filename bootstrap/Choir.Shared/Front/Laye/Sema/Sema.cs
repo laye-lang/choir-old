@@ -4,6 +4,8 @@ using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics.Metrics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using System.Xml.Linq;
 
 using Choir.CommandLine;
 using Choir.Front.Laye.Syntax;
@@ -79,6 +81,7 @@ public partial class Sema
             foreach (var topLevelNode in unitDecl.TopLevelDeclarations)
             {
                 var decl = sema.AnalyseTopLevelDecl(topLevelNode);
+                if (decl is null) continue;
 
                 if (decl is SemaDeclFunction declFunction && declFunction.Name == "main" &&
                     declFunction.ReturnType.CanonicalType.Type == context.Types.LayeTypeInt &&
@@ -197,6 +200,26 @@ public partial class Sema
         }
     }
 
+    private bool IsAllowedDeclConfiguration(SyntaxNode decl)
+    {
+        static bool IsTargetConditionValid(SyntaxTargetCondition? t)
+        {
+            string expectedTargetString = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "windows" : "linux";
+            return t is null || t.TargetStringToken.TextValue == expectedTargetString;
+        }
+
+        switch (decl)
+        {
+            default: return true;
+            case SyntaxDeclAlias declAlias: return IsTargetConditionValid(declAlias.TargetCondition);
+            case SyntaxDeclFunction declFunc: return IsTargetConditionValid(declFunc.TargetCondition);
+            case SyntaxDeclBinding declBinding: return IsTargetConditionValid(declBinding.TargetCondition);
+            case SyntaxDeclStruct declStruct: return IsTargetConditionValid(declStruct.TargetCondition);
+            case SyntaxDeclEnum declEnum: return IsTargetConditionValid(declEnum.TargetCondition);
+            case SyntaxDeclRegister declRegister: return IsTargetConditionValid(declRegister.TargetCondition);
+        }
+    }
+
     private string TransformOperatorNameToSymbolName(SyntaxOperatorName operatorName)
     {
         switch (operatorName)
@@ -259,6 +282,7 @@ public partial class Sema
     private bool ForwardDeclareIfAllowedOutOfOrder(SyntaxNode node, [NotNullWhen(true)] out SemaDeclNamed? forwardDecl, Scope? scope = null)
     {
         forwardDecl = null;
+        if (!IsAllowedDeclConfiguration(node)) return false;
 
         var declaringScope = scope ?? CurrentScope;
         bool isAtModuleScope = declaringScope == ModuleScope;
@@ -353,6 +377,7 @@ public partial class Sema
 
     private void PopulateForwardDeclarationIfAvailable(SyntaxNode decl)
     {
+        if (!IsAllowedDeclConfiguration(decl)) return;
         if (!_forwardDeclNodes.TryGetValue(decl, out var forwardDecl))
             return;
 
@@ -390,8 +415,10 @@ public partial class Sema
         }
     }
 
-    private SemaDecl AnalyseTopLevelDecl(SyntaxNode decl)
+    private SemaDecl? AnalyseTopLevelDecl(SyntaxNode decl)
     {
+        if (!IsAllowedDeclConfiguration(decl)) return null;
+
         switch (decl)
         {
             default:
@@ -401,17 +428,19 @@ public partial class Sema
             }
 
             case SyntaxDeclAlias or SyntaxDeclStruct or SyntaxDeclEnum or SyntaxDeclRegister or SyntaxDeclBinding or SyntaxDeclFunction:
-                return (SemaDecl)AnalyseStmtOrDecl(decl);
+                return (SemaDecl)AnalyseStmtOrDecl(decl)!;
         }
     }
 
-    private SemaStmt AnalyseStmtOrDecl(SyntaxNode stmt, bool inheritCurrentScope = false)
+    private SemaStmt? AnalyseStmtOrDecl(SyntaxNode stmt, bool inheritCurrentScope = false)
     {
         if (stmt is SyntaxTypeBuffer or SyntaxTypeBuiltIn or SyntaxTypeNilable or SyntaxTypePointer or SyntaxTypeSlice)
         {
             Context.Assert(false, $"shouldn't ever call {nameof(AnalyseStmtOrDecl)} on nodes which can only be types; those should only exist in a type context and go through {nameof(AnalyseType)}");
             throw new UnreachableException();
         }
+
+        if (!IsAllowedDeclConfiguration(stmt)) return null;
 
         switch (stmt)
         {
@@ -526,7 +555,7 @@ public partial class Sema
 
                 if (declFunction.Body is SyntaxCompound bodyCompound)
                 {
-                    var body = (SemaStmtCompound)AnalyseStmtOrDecl(bodyCompound, inheritCurrentScope: true);
+                    var body = (SemaStmtCompound)AnalyseStmtOrDecl(bodyCompound, inheritCurrentScope: true)!;
                     semaNode.Body = body;
 
                     if (body.ControlFlow < StmtControlFlow.Return && !semaNode.ReturnType.IsVoid)
@@ -566,7 +595,7 @@ public partial class Sema
                     ForwardDeclareIfAllowedOutOfOrder(node, out var _);
                 // TODO(local): handle forward declarations in compound statements
                 // TODO(local): create scopes in compound statements.
-                var childStatements = stmtCompound.Body.Select(node => AnalyseStmtOrDecl(node)).ToArray();
+                var childStatements = stmtCompound.Body.Select(node => AnalyseStmtOrDecl(node)!).ToArray();
 
                 var endDefer = CurrentScope.CurrentDefer;
                 return new SemaStmtCompound(stmtCompound.Location, childStatements)
@@ -649,7 +678,7 @@ public partial class Sema
 
             case SyntaxStmtDefer stmtDefer:
             {
-                var deferred = AnalyseStmtOrDecl(stmtDefer.Stmt);
+                var deferred = AnalyseStmtOrDecl(stmtDefer.Stmt)!;
                 Context.Assert(deferred is not SemaDecl, deferred.Location, "Should not have parsed a declaration in defer context.");
                 var semaNode = new SemaStmtDefer(stmtDefer.Location, deferred);
 
@@ -675,7 +704,7 @@ public partial class Sema
                     var condition = AnalyseExpr(stmtIf.Conditions[i].Condition, boolType);
                     condition = ConvertOrError(condition, boolType);
 
-                    var body = AnalyseStmtOrDecl(stmtIf.Conditions[i].Body);
+                    var body = AnalyseStmtOrDecl(stmtIf.Conditions[i].Body)!;
                     conditions[i] = new(stmtIf.Conditions[i].Location, condition, body);
                 }
 

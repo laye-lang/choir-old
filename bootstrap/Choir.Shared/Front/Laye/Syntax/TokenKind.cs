@@ -81,6 +81,7 @@ public enum TokenKind : ushort
     SlashEqual,
     QuestionQuestion,
     QuestionQuestionEqual,
+    HashSquare,
 
     Var,
     Void,

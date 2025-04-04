@@ -24,7 +24,7 @@ public sealed class SyntaxDeclModuleUnitHeader(Location location, SyntaxDeclModu
     : SyntaxNode(location)
 {
     public SyntaxDeclModule? ModuleDeclaration { get; } = declModule;
-    public string? ModuleName => ModuleDeclaration?.TokenName.TextValue;
+    public string? ModuleName => ModuleDeclaration?.ModuleName;
     public IReadOnlyList<SyntaxDeclImport> ImportDeclarations { get; } = [.. declImports];
     public override bool IsDecl { get; } = true;
     public override IEnumerable<SyntaxNode> Children
@@ -39,13 +39,14 @@ public sealed class SyntaxDeclModuleUnitHeader(Location location, SyntaxDeclModu
     }
 }
 
-public sealed class SyntaxDeclModule(SyntaxToken tokenModule, SyntaxToken tokenName)
-    : SyntaxNode(tokenName.Location)
+public sealed class SyntaxDeclModule(SyntaxToken tokenModule, IEnumerable<SyntaxToken> tokenNames)
+    : SyntaxNode(tokenNames.FirstOrDefault()?.Location ?? tokenModule.Location)
 {
     public SyntaxToken TokenModule { get; } = tokenModule;
-    public SyntaxToken TokenName { get; } = tokenName;
+    public IReadOnlyList<SyntaxToken> TokenNames { get; } = [.. tokenNames];
+    public string ModuleName { get; } = string.Join(".", tokenNames.Select(tk => tk.TextValue));
     public override bool IsDecl { get; } = true;
-    public override IEnumerable<SyntaxNode> Children { get; } = [tokenModule, tokenName];
+    public override IEnumerable<SyntaxNode> Children { get; } = [tokenModule, .. tokenNames];
 }
 
 public abstract class SyntaxImportQuery(Location location) : SyntaxNode(location)
@@ -278,6 +279,7 @@ public sealed class SyntaxDeclFunction(SyntaxNode returnType, SyntaxNode name, I
     : SyntaxNode(name.Location)
 {
     public required SyntaxTemplateParams? TemplateParams { get; init; }
+    public required SyntaxTargetCondition? TargetCondition { get; init; }
     public required IReadOnlyList<SyntaxAttrib> Attribs { get; init; }
 
     public SyntaxNode ReturnType { get; } = returnType;
@@ -315,6 +317,7 @@ public sealed class SyntaxDeclBinding(SyntaxNode bindingType, SyntaxToken tokenN
     : SyntaxNode(tokenName.Location)
 {
     public required SyntaxTemplateParams? TemplateParams { get; init; }
+    public required SyntaxTargetCondition? TargetCondition { get; init; }
     public required IReadOnlyList<SyntaxAttrib> Attribs { get; init; }
 
     public SyntaxNode BindingType { get; } = bindingType;
@@ -387,8 +390,9 @@ public sealed class SyntaxDeclStruct(SyntaxToken tokenStructOrVariant, SyntaxTok
     : SyntaxNode(tokenName.Location)
 {
     public required SyntaxTemplateParams? TemplateParams { get; init; }
+    public required SyntaxTargetCondition? TargetCondition { get; init; }
     public required IReadOnlyList<SyntaxAttrib> Attribs { get; init; }
-    
+
     public SyntaxToken TokenStructOrVariant { get; } = tokenStructOrVariant;
     public SyntaxToken TokenName { get; } = tokenName;
     public IReadOnlyList<SyntaxDeclField> Fields { get; } = fields;
@@ -429,6 +433,7 @@ public sealed class SyntaxDeclEnum(SyntaxToken tokenEnum, SyntaxToken tokenName,
     : SyntaxNode(tokenName.Location)
 {
     public required SyntaxTemplateParams? TemplateParams { get; init; }
+    public required SyntaxTargetCondition? TargetCondition { get; init; }
     public required IReadOnlyList<SyntaxAttrib> Attribs { get; init; }
 
     public SyntaxToken TokenEnum { get; } = tokenEnum;
@@ -456,6 +461,7 @@ public sealed class SyntaxDeclAlias(SyntaxToken? tokenStrict, SyntaxToken tokenA
     : SyntaxNode(tokenName.Location)
 {
     public required SyntaxTemplateParams? TemplateParams { get; init; }
+    public required SyntaxTargetCondition? TargetCondition { get; init; }
     public required IReadOnlyList<SyntaxAttrib> Attribs { get; init; }
 
     public SyntaxToken? TokenStrict { get; } = tokenStrict;
@@ -485,6 +491,7 @@ public sealed class SyntaxDeclAlias(SyntaxToken? tokenStrict, SyntaxToken tokenA
 public sealed class SyntaxDeclRegister(SyntaxToken tokenRegister, SyntaxToken tokenRegisterName, SyntaxNode registerType, SyntaxToken tokenDeclName)
     : SyntaxNode(tokenRegister.Location)
 {
+    public required SyntaxTargetCondition? TargetCondition { get; init; }
     public required IReadOnlyList<SyntaxAttrib> Attribs { get; init; }
 
     public SyntaxToken TokenRegister { get; } = tokenRegister;

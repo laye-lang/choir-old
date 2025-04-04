@@ -443,6 +443,7 @@ public sealed class LayeCodegen(LayeModule module, LLVMModuleRef llvmModule)
     {
         Context.Assert(function.Body is not null, function.Location, "Attempt to generate code for a function definition when only a declaration is present.");
         Context.Assert(_declaredValues.ContainsKey(function), function.Location, "No LLVM function declaration was generated for this function.");
+        Context.Assert(_functionInfos.ContainsKey(function), function.Location, "No function info was generated for this function.");
 
         CurrentFunction = function;
 
@@ -896,8 +897,7 @@ public sealed class LayeCodegen(LayeModule module, LLVMModuleRef llvmModule)
                 {
                     Context.Todo(stmtDec.Location, $"Implement increment for type {stmtDec.Operand.Type.ToDebugString(Colors)}");
                 }
-            }
-            break;
+            } break;
 
             case SemaStmtExpr expr:
             {

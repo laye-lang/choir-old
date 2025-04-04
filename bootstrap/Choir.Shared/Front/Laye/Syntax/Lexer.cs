@@ -282,6 +282,7 @@ public sealed class Lexer(SourceFile sourceFile)
             case '}': Advance(); tokenInfo.Kind = TokenKind.CloseBrace; break;
             case ';': Advance(); tokenInfo.Kind = TokenKind.SemiColon; break;
             case ',': Advance(); tokenInfo.Kind = TokenKind.Comma; break;
+            case '#' when Peek(1) == '[': Advance(); Advance(); tokenInfo.Kind = TokenKind.HashSquare; break;
             
             case '.':
             {
@@ -444,17 +445,12 @@ public sealed class Lexer(SourceFile sourceFile)
             {
                 default: return;
 
-                case '#':
-                {
-                    Advance();
-                    while (!IsAtEnd && CurrentCharacter != '\n')
-                        Advance();
-                } break;
-
+                case '#' when Peek(1) == '!' && _position == 0:
                 case '/' when Peek(1) == '/':
                 {
                     Advance();
                     Advance();
+
                     while (!IsAtEnd && CurrentCharacter != '\n')
                         Advance();
                 } break;

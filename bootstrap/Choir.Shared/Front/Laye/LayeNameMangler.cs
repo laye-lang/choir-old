@@ -75,7 +75,7 @@ public sealed class LayeNameMangler(ChoirContext context, LayeModule module)
 
     private string NormalizeIdentifier(string identifier)
     {
-        static bool IsValidNameCharacter(char c) => char.IsAsciiLetterOrDigit(c) || c == '_';
+        static bool IsValidNameCharacter(char c) => char.IsAsciiLetterOrDigit(c) || c is '_' or '.';
         bool isValid = identifier.All(IsValidNameCharacter);
         Context.Assert(isValid, $"Only ASCII identifiers are supported (got '{identifier}')");
         return identifier;

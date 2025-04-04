@@ -1,5 +1,12 @@
-
 namespace Choir.Front.Laye.Syntax;
+
+public sealed class SyntaxTargetCondition(SyntaxToken targetToken, SyntaxToken targetStringToken)
+    : SyntaxNode(targetToken.Location)
+{
+    public SyntaxToken TargetToken { get; } = targetToken;
+    public SyntaxToken TargetStringToken { get; } = targetStringToken;
+    public override IEnumerable<SyntaxNode> Children { get; } = [targetToken, targetStringToken];
+}
 
 public abstract class SyntaxAttrib(Location location) : SyntaxNode(location);
 
