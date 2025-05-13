@@ -362,6 +362,8 @@ public partial class Parser(SourceFile sourceFile)
     {
         var location = CurrentLocation;
 
+        var targetCondition = ParseTargetConditionIfPresent();
+
         SyntaxDeclModule? declModule = null;
         if (At(TokenKind.Module))
             declModule = ParseModuleDeclaration();
@@ -374,19 +376,11 @@ public partial class Parser(SourceFile sourceFile)
             declImports.Add(declImport);
         }
 
-        return new(location, declModule, declImports);
+        return new(location, targetCondition, declModule, declImports);
     }
 
-    public SyntaxNode? ParseTopLevelSyntax()
+    private SyntaxTargetCondition? ParseTargetConditionIfPresent()
     {
-        if (IsAtEnd) return null;
-
-        if (At(TokenKind.Import) || (At(TokenKind.Export) && PeekAt(1, TokenKind.Import)))
-        {
-            Context.Diag.Error("Import declarations must appear at the start of the source file in the module unit header.");
-            return ParseImportDeclaration();
-        }
-
         SyntaxTargetCondition? targetCondition = null;
         if (TryAdvance(TokenKind.HashSquare, out var hashSquareToken))
         {
@@ -407,6 +401,21 @@ public partial class Parser(SourceFile sourceFile)
 
             targetCondition = new SyntaxTargetCondition(targetToken, targetStringToken);
         }
+
+        return targetCondition;
+    }
+
+    public SyntaxNode? ParseTopLevelSyntax()
+    {
+        if (IsAtEnd) return null;
+
+        if (At(TokenKind.Import) || (At(TokenKind.Export) && PeekAt(1, TokenKind.Import)))
+        {
+            Context.Diag.Error("Import declarations must appear at the start of the source file in the module unit header.");
+            return ParseImportDeclaration();
+        }
+
+        var targetCondition = ParseTargetConditionIfPresent();
 
         SyntaxTemplateParams? templateParams = null;
         if (TryAdvance(TokenKind.Template, out var tokenTemplate))

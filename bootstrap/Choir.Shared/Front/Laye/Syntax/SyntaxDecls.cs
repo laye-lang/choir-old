@@ -20,9 +20,10 @@ public sealed class SyntaxDeclModuleUnit(SourceFile sourceFile, SyntaxDeclModule
     }
 }
 
-public sealed class SyntaxDeclModuleUnitHeader(Location location, SyntaxDeclModule? declModule, IEnumerable<SyntaxDeclImport> declImports)
+public sealed class SyntaxDeclModuleUnitHeader(Location location, SyntaxTargetCondition? targetCondition, SyntaxDeclModule? declModule, IEnumerable<SyntaxDeclImport> declImports)
     : SyntaxNode(location)
 {
+    public SyntaxTargetCondition? TargetCondition { get; } = targetCondition;
     public SyntaxDeclModule? ModuleDeclaration { get; } = declModule;
     public string? ModuleName => ModuleDeclaration?.ModuleName;
     public IReadOnlyList<SyntaxDeclImport> ImportDeclarations { get; } = [.. declImports];

@@ -562,6 +562,19 @@ public sealed class SemaDeclAlias(Location location, string name, bool isStrict 
                 yield return TemplateParameters;
         }
     }
+
+    public override SerializedDeclKind SerializedDeclKind { get; } = SerializedDeclKind.Alias;
+    public override void Serialize(ModuleSerializer serializer, BinaryWriter writer)
+    {
+        writer.Write(IsStrict);
+        serializer.WriteTypeQual(writer, AliasedType);
+    }
+
+    public override void Deserialize(ModuleDeserializer deserializer, BinaryReader reader)
+    {
+        IsStrict = reader.ReadBoolean();
+        AliasedType = deserializer.ReadTypeQual(reader);
+    }
 }
 
 public sealed class SemaDeclRegister(Location location, string registerName, string name)

@@ -1,16 +1,9 @@
-using System;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using System.Diagnostics.Metrics;
-using System.Numerics;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using System.Xml.Linq;
 
 using Choir.CommandLine;
 using Choir.Front.Laye.Syntax;
-
-using LLVMSharp;
 
 namespace Choir.Front.Laye.Sema;
 
@@ -22,6 +15,8 @@ public partial class Sema
         var context = module.Context;
 
         var sema = new Sema(module);
+        unitDecls = [.. unitDecls.Where(sema.IsAllowedDeclConfiguration)];
+
         sema.ResolveModuleImports(unitDecls);
 
         foreach (var unitDecl in unitDecls)
@@ -211,6 +206,7 @@ public partial class Sema
         switch (decl)
         {
             default: return true;
+            case SyntaxDeclModuleUnitHeader declModule: return IsTargetConditionValid(declModule.TargetCondition);
             case SyntaxDeclAlias declAlias: return IsTargetConditionValid(declAlias.TargetCondition);
             case SyntaxDeclFunction declFunc: return IsTargetConditionValid(declFunc.TargetCondition);
             case SyntaxDeclBinding declBinding: return IsTargetConditionValid(declBinding.TargetCondition);
